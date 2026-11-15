@@ -28,7 +28,8 @@ import com.example.hostelmanager.ui.rooms.RoomListScreen
 fun HostelDashboardScreen(
     hostelId: String,
     onBackClick: () -> Unit,
-    onAddResidentClick: () -> Unit
+    onAddResidentClick: () -> Unit,
+    onRoomClick: (String) -> Unit
 ) {
     var selectedTab by remember { mutableIntStateOf(0) }
 
@@ -64,8 +65,10 @@ fun HostelDashboardScreen(
                 RoomListScreen(
                     hostelId = hostelId,
                     onBackClick = { },
-                    onAddResidentClick = { onAddResidentClick() }
-                )
+                    onAddResidentClick = { onAddResidentClick() },
+
+                    onRoomClick = { roomId -> onRoomClick(roomId)}
+                        )
             }
             1 -> {
                 // PLUGGED IN: The actual Resident List Screen!

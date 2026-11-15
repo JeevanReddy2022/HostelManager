@@ -1,18 +1,16 @@
 package com.example.hostelmanager.ui.rooms
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material.icons.filled.PersonAdd
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
@@ -29,7 +27,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -40,7 +37,8 @@ import com.example.hostelmanager.data.RoomWithOccupancy
 fun RoomListScreen(
     hostelId: String,
     onBackClick: () -> Unit,
-    onAddResidentClick: (String) -> Unit,
+    onAddResidentClick: () -> Unit,
+    onRoomClick: (String) -> Unit, // NEW: Handles tapping a room card
     viewModel: RoomViewModel = viewModel()
 ) {
     LaunchedEffect(hostelId) {
@@ -62,16 +60,8 @@ fun RoomListScreen(
             )
         },
         floatingActionButton = {
-            Column(horizontalAlignment = Alignment.End) {
-                // Single button now: "+" to add a room
-                FloatingActionButton(onClick = { showAddDialog = true }) {
-                    Icon(Icons.Default.Add, contentDescription = "Add Room")
-                }
-                Spacer(modifier = Modifier.height(16.dp))
-                // Bottom button: Add Room (Standard + icon)
-                FloatingActionButton(onClick = { showAddDialog = true }) {
-                    Icon(Icons.Default.Add, contentDescription = "Add Room")
-                }
+            FloatingActionButton(onClick = { showAddDialog = true }) {
+                Icon(Icons.Default.Add, contentDescription = "Add Room")
             }
         }
     ) { padding ->
@@ -95,7 +85,8 @@ fun RoomListScreen(
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 items(roomsWithOccupancy) { roomWithOccupancy ->
-                    RoomCard(roomWithOccupancy)
+                    // Pass the click action to the card
+                    RoomCard(roomWithOccupancy, onClick = { onRoomClick(roomWithOccupancy.room.id) })
                 }
             }
         }
@@ -113,11 +104,15 @@ fun RoomListScreen(
 }
 
 @Composable
-fun RoomCard(roomWithOccupancy: RoomWithOccupancy) {
+fun RoomCard(roomWithOccupancy: RoomWithOccupancy, onClick: () -> Unit) {
     val room = roomWithOccupancy.room
     val vacancy = room.bedCount - roomWithOccupancy.occupiedBeds
 
-    Card(modifier = Modifier.fillMaxWidth()) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onClick() } // Makes the whole card tappable
+    ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Text("Room ${room.roomNumber}", style = MaterialTheme.typography.titleLarge)
             Text("Floor: ${room.floor}")

@@ -9,7 +9,6 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface PersonDao {
-
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertPerson(person: Person)
 
@@ -34,7 +33,19 @@ interface PersonDao {
     """)
     fun getActiveResidentsByHostel(hostelId: String): Flow<List<ResidentWithRoom>>
 
-    // NEW: Three separate checks to see exactly which field is a duplicate
+    // NEW: Find residents in a specific room
+    @Query("""
+        SELECT p.id, p.name, p.phone, p.govtIdNumber, p.emergencyContact, p.dateOfBirth, 
+               p.address, p.gender, p.guardianName, p.govtIdPhotoPath, p.profilePhotoPath, 
+               p.createdAt, p.updatedAt, r.roomNumber 
+        FROM persons p 
+        INNER JOIN stays s ON p.id = s.personId 
+        INNER JOIN rooms r ON s.roomId = r.id 
+        WHERE s.roomId = :roomId AND s.isActive = 1 
+        ORDER BY p.name ASC
+    """)
+    fun getActiveResidentsByRoom(roomId: String): Flow<List<ResidentWithRoom>>
+
     @Query("SELECT COUNT(*) FROM persons p INNER JOIN stays s ON p.id = s.personId WHERE s.isActive = 1 AND p.phone = :phone")
     suspend fun isPhoneDuplicate(phone: String): Boolean
 
