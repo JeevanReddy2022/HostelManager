@@ -5,11 +5,17 @@ import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
 
-@Database(entities = [Hostel::class], version = 1, exportSchema = false)
+@Database(
+    entities = [Hostel::class, RoomEntity::class, Person::class, Stay::class],
+    version = 4,
+    exportSchema = false
+)
 abstract class AppDatabase : RoomDatabase() {
 
-    // The front desk: hands out the Hostel staff (DAO)
     abstract fun hostelDao(): HostelDao
+    abstract fun roomDao(): RoomDao
+    abstract fun personDao(): PersonDao
+    abstract fun stayDao(): StayDao
 
     companion object {
         @Volatile
@@ -21,7 +27,9 @@ abstract class AppDatabase : RoomDatabase() {
                     context.applicationContext,
                     AppDatabase::class.java,
                     "hostel_manager_db"
-                ).build()
+                )
+                    .fallbackToDestructiveMigration()
+                    .build()
                 INSTANCE = instance
                 instance
             }
