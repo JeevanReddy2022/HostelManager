@@ -1,5 +1,6 @@
 package com.example.hostelmanager.data
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.PrimaryKey
 
@@ -11,12 +12,16 @@ data class Person(
     val phone: String,
     val govtIdNumber: String,
     val emergencyContact: String,
-    val dateOfBirth: String = "",        // NEW: For ID verification
-    val address: String = "",
-    val gender: String = "",
-    val guardianName: String = "",
-    val govtIdPhotoPath: String = "",    // NEW: Will store the photo file location in v2
-    val profilePhotoPath: String = "",   // NEW: Will store the photo file location in v2
+    val dateOfBirth: String,
+    val address: String,
+    val gender: String,
+    val guardianName: String,
+
+    val govtIdPhotoPath: String = "",          // Govt ID — FRONT side image path
+    @ColumnInfo(defaultValue = "")
+    val govtIdBackPath: String = "",           // Govt ID — BACK side image path (new)
+    val profilePhotoPath: String = "",         // Person photo (optional)
+
     val createdAt: Long = System.currentTimeMillis(),
     val updatedAt: Long = System.currentTimeMillis()
 )

@@ -23,7 +23,6 @@ class ResidentViewModel(application: Application) : AndroidViewModel(application
 
     private val _hostelId = MutableStateFlow("")
 
-    // Specific error states for each field
     private val _phoneError = MutableStateFlow<String?>(null)
     val phoneError: StateFlow<String?> = _phoneError
 
@@ -46,18 +45,17 @@ class ResidentViewModel(application: Application) : AndroidViewModel(application
         hostelId: String,
         name: String, phone: String, govtIdNumber: String, emergencyContact: String,
         dateOfBirth: String, address: String, gender: String, guardianName: String,
-        roomId: String, joinDate: String, rentPaise: Long, depositPaise: Long
+        roomId: String, joinDate: String, rentPaise: Long, depositPaise: Long,
+        govtFrontPath: String, govtBackPath: String, profilePhotoPath: String
     ): Boolean {
         if (hostelId.isEmpty() || roomId.isEmpty()) return false
 
-        // Clear old errors
         _phoneError.value = null
         _govtIdError.value = null
         _emergencyError.value = null
 
         var hasDuplicates = false
 
-        // 1. Check each field individually
         if (personDao.isPhoneDuplicate(phone)) {
             _phoneError.value = "This phone number is already in use!"
             hasDuplicates = true
@@ -71,23 +69,24 @@ class ResidentViewModel(application: Application) : AndroidViewModel(application
             hasDuplicates = true
         }
 
-        // If any duplicates were found, stop and return false
         if (hasDuplicates) return false
 
-        // 2. Save Person
         val newPerson = Person(
             name = name, phone = phone, govtIdNumber = govtIdNumber,
             emergencyContact = emergencyContact, dateOfBirth = dateOfBirth,
-            address = address, gender = gender, guardianName = guardianName
+            address = address, gender = gender, guardianName = guardianName,
+            govtIdPhotoPath = govtFrontPath,
+            govtIdBackPath = govtBackPath,
+            profilePhotoPath = profilePhotoPath
         )
         personDao.insertPerson(newPerson)
 
-        // 3. Save Stay
         val newStay = Stay(
             personId = newPerson.id,
             hostelId = hostelId,
             roomId = roomId,
             joinDate = joinDate,
+            monthlyRent = rentPaise,
             depositCollected = depositPaise,
             isActive = true
         )

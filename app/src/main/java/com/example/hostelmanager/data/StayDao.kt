@@ -16,14 +16,22 @@ interface StayDao {
     @Update
     suspend fun updateStay(stay: Stay)
 
-    // Get all stays for a specific person (to show their history)
     @Query("SELECT * FROM stays WHERE personId = :personId ORDER BY joinDate DESC")
     fun getStaysByPerson(personId: String): Flow<List<Stay>>
 
-    // Get all currently active stays in a specific hostel
     @Query("SELECT * FROM stays WHERE hostelId = :hostelId AND isActive = 1 ORDER BY joinDate DESC")
     fun getActiveStaysByHostel(hostelId: String): Flow<List<Stay>>
 
     @Query("SELECT * FROM stays WHERE id = :id")
     suspend fun getStayById(id: String): Stay?
+
+    @Query("UPDATE stays SET monthlyRent = :rentPaise, updatedAt = :updatedAt WHERE roomId = :roomId AND isActive = 1")
+    suspend fun updateRentForActiveStays(roomId: String, rentPaise: Long, updatedAt: Long)
+
+    @Query("SELECT COUNT(*) FROM stays WHERE roomId = :roomId")
+    fun countStaysForRoom(roomId: String): Flow<Int>
+
+    // NEW: the currently-active stay for one person (details screen)
+    @Query("SELECT * FROM stays WHERE personId = :personId AND isActive = 1 ORDER BY joinDate DESC LIMIT 1")
+    fun getActiveStayByPerson(personId: String): Flow<Stay?>
 }

@@ -1,5 +1,6 @@
 package com.example.hostelmanager.data
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.ForeignKey
 import androidx.room.Index
@@ -20,15 +21,20 @@ data class Stay(
     val personId: String,
     val hostelId: String,
     val roomId: String,
-    val joinDate: String, // ISO format: YYYY-MM-DD
-    val checkoutDate: String? = null, // null means currently active
-    val openingBalance: Long = 0, // in paise
-    val depositCollected: Long = 0, // in paise
-    val depositRefunded: Long = 0, // in paise
+    val joinDate: String,
+    val checkoutDate: String? = null,
+
+    // NEW: this resident's own agreed monthly rent, in paise
+    @ColumnInfo(defaultValue = "0")
+    val monthlyRent: Long = 0,
+
+    val openingBalance: Long = 0,
+    val depositCollected: Long = 0,
+    val depositRefunded: Long = 0,
     val depositRefundDate: String? = null,
-    val depositRefundMode: String? = null, // "CASH" or "UPI"
+    val depositRefundMode: String? = null,
     val isActive: Boolean = true,
-    val returnOverlapDecision: String? = null, // "CHARGE_FRESH" or "CREDIT_ADDED"
+    val returnOverlapDecision: String? = null,
     val createdAt: Long = System.currentTimeMillis(),
     val updatedAt: Long = System.currentTimeMillis()
 )

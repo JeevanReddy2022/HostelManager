@@ -19,7 +19,6 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
 import com.example.hostelmanager.ui.residents.ResidentListScreen
 import com.example.hostelmanager.ui.rooms.RoomListScreen
 
@@ -29,7 +28,8 @@ fun HostelDashboardScreen(
     hostelId: String,
     onBackClick: () -> Unit,
     onAddResidentClick: () -> Unit,
-    onRoomClick: (String) -> Unit
+    onRoomClick: (String) -> Unit,
+    onResidentClick: (String) -> Unit
 ) {
     var selectedTab by remember { mutableIntStateOf(0) }
 
@@ -39,7 +39,7 @@ fun HostelDashboardScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Hostel Dashboard") },
+                title = { Text(tabs[selectedTab]) },
                 navigationIcon = {
                     IconButton(onClick = onBackClick) {
                         Icon(Icons.Default.ArrowBack, contentDescription = "Back")
@@ -61,23 +61,17 @@ fun HostelDashboardScreen(
         }
     ) { padding ->
         when (selectedTab) {
-            0 -> {
-                RoomListScreen(
-                    hostelId = hostelId,
-                    onBackClick = { },
-                    onAddResidentClick = { onAddResidentClick() },
-
-                    onRoomClick = { roomId -> onRoomClick(roomId)}
-                        )
-            }
-            1 -> {
-                // PLUGGED IN: The actual Resident List Screen!
-                ResidentListScreen(
-                    hostelId = hostelId,
-                    onAddClick = { onAddResidentClick() },
-                    modifier = Modifier.padding(padding)
-                )
-            }
+            0 -> RoomListScreen(
+                hostelId = hostelId,
+                onRoomClick = { roomId -> onRoomClick(roomId) },
+                modifier = Modifier.padding(padding)
+            )
+            1 -> ResidentListScreen(
+                hostelId = hostelId,
+                onAddClick = { onAddResidentClick() },
+                onResidentClick = { personId -> onResidentClick(personId) },
+                modifier = Modifier.padding(padding)
+            )
         }
     }
 }

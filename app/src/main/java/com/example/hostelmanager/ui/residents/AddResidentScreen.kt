@@ -42,6 +42,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.hostelmanager.data.RoomWithOccupancy
+import com.example.hostelmanager.ui.components.ImagePickerField
 import kotlinx.coroutines.launch
 import java.time.Instant
 import java.time.ZoneId
@@ -59,7 +60,6 @@ fun AddResidentScreen(
     val roomsWithOccupancy by viewModel.roomsForHostel.collectAsState()
     val availableRooms = roomsWithOccupancy.filter { (it.room.bedCount - it.occupiedBeds) > 0 }
 
-    // Listen for specific errors
     val phoneError by viewModel.phoneError.collectAsState()
     val govtIdError by viewModel.govtIdError.collectAsState()
     val emergencyError by viewModel.emergencyError.collectAsState()
@@ -81,11 +81,17 @@ fun AddResidentScreen(
     var rent by remember { mutableStateOf("") }
     var deposit by remember { mutableStateOf("") }
 
+    // Image paths
+    var govtFrontPath by remember { mutableStateOf<String?>(null) }
+    var govtBackPath by remember { mutableStateOf<String?>(null) }
+    var profilePhotoPath by remember { mutableStateOf<String?>(null) }
+
     val genders = listOf("Male", "Female", "Other")
     var expandedGender by remember { mutableStateOf(false) }
     var selectedGender by remember { mutableStateOf("Male") }
 
-    var expandedRoom by remember { mutableStateOf(false) }
+    var expandedIdType by remember { mutableStateOf(false) }
+    var expandedRoomSelect by remember { mutableStateOf(false) }
     var selectedRoom by remember { mutableStateOf<RoomWithOccupancy?>(null) }
 
     val joinDatePickerState = rememberDatePickerState()
@@ -116,9 +122,11 @@ fun AddResidentScreen(
         else -> false
     }
 
+    // Both ID photos are required
     val isFormValid = name.isNotBlank() && isPhoneValid && isIdValid && isEmergencyValid &&
             selectedRoom != null && joinDate.isNotBlank() && dob.isNotBlank() &&
-            rent.isNotBlank() && deposit.isNotBlank()
+            rent.isNotBlank() && deposit.isNotBlank() &&
+            !govtFrontPath.isNullOrBlank() && !govtBackPath.isNullOrBlank()
 
     Scaffold(
         topBar = {
@@ -155,16 +163,16 @@ fun AddResidentScreen(
                 }
             )
 
-            ExposedDropdownMenuBox(expanded = expandedGender, onExpandedChange = { expandedGender = !expandedGender }) {
+            ExposedDropdownMenuBox(expanded = expandedIdType, onExpandedChange = { expandedIdType = !expandedIdType }) {
                 OutlinedTextField(
                     value = selectedIdType, onValueChange = { }, readOnly = true,
                     label = { Text("ID Type *") },
-                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expandedGender) },
+                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expandedIdType) },
                     modifier = Modifier.fillMaxWidth().menuAnchor()
                 )
-                ExposedDropdownMenu(expanded = expandedGender, onDismissRequest = { expandedGender = false }) {
+                ExposedDropdownMenu(expanded = expandedIdType, onDismissRequest = { expandedIdType = false }) {
                     idTypes.forEach { type ->
-                        DropdownMenuItem(text = { Text(type) }, onClick = { selectedIdType = type; govtId = ""; expandedGender = false })
+                        DropdownMenuItem(text = { Text(type) }, onClick = { selectedIdType = type; govtId = ""; expandedIdType = false })
                     }
                 }
             }
@@ -210,16 +218,16 @@ fun AddResidentScreen(
 
             OutlinedTextField(value = address, onValueChange = { address = it }, label = { Text("Address") }, modifier = Modifier.fillMaxWidth())
 
-            ExposedDropdownMenuBox(expanded = expandedRoom, onExpandedChange = { expandedRoom = !expandedRoom }) {
+            ExposedDropdownMenuBox(expanded = expandedGender, onExpandedChange = { expandedGender = !expandedGender }) {
                 OutlinedTextField(
                     value = selectedGender, onValueChange = { }, readOnly = true,
                     label = { Text("Gender") },
-                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expandedRoom) },
+                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expandedGender) },
                     modifier = Modifier.fillMaxWidth().menuAnchor()
                 )
-                ExposedDropdownMenu(expanded = expandedRoom, onDismissRequest = { expandedRoom = false }) {
+                ExposedDropdownMenu(expanded = expandedGender, onDismissRequest = { expandedGender = false }) {
                     genders.forEach { gender ->
-                        DropdownMenuItem(text = { Text(gender) }, onClick = { selectedGender = gender; expandedRoom = false })
+                        DropdownMenuItem(text = { Text(gender) }, onClick = { selectedGender = gender; expandedGender = false })
                     }
                 }
             }
@@ -229,7 +237,6 @@ fun AddResidentScreen(
             Spacer(modifier = Modifier.height(16.dp))
             Text("Stay Details", style = MaterialTheme.typography.titleMedium)
 
-            var expandedRoomSelect by remember { mutableStateOf(false) }
             ExposedDropdownMenuBox(expanded = expandedRoomSelect, onExpandedChange = { expandedRoomSelect = !expandedRoomSelect }) {
                 OutlinedTextField(
                     value = selectedRoom?.room?.roomNumber ?: "", onValueChange = { }, readOnly = true,
@@ -278,6 +285,29 @@ fun AddResidentScreen(
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
             )
 
+            // MOVED: Documents & Photo now sits at the end, right before Save
+            Spacer(modifier = Modifier.height(16.dp))
+            Text("Documents & Photo", style = MaterialTheme.typography.titleMedium)
+
+            ImagePickerField(
+                label = "Govt ID - Front",
+                imagePath = govtFrontPath,
+                isRequired = true,
+                onImageCaptured = { govtFrontPath = it }
+            )
+            ImagePickerField(
+                label = "Govt ID - Back",
+                imagePath = govtBackPath,
+                isRequired = true,
+                onImageCaptured = { govtBackPath = it }
+            )
+            ImagePickerField(
+                label = "Person Photo",
+                imagePath = profilePhotoPath,
+                isRequired = false,
+                onImageCaptured = { profilePhotoPath = it }
+            )
+
             Button(
                 onClick = {
                     val rentInPaise = rent.toLongOrNull()?.times(100) ?: 0L
@@ -286,7 +316,8 @@ fun AddResidentScreen(
                     scope.launch {
                         val isSuccess = viewModel.addResident(
                             hostelId, name, phone, govtId, emergency, dob, address, selectedGender, guardian,
-                            selectedRoom!!.room.id, joinDate, rentInPaise, depositInPaise
+                            selectedRoom!!.room.id, joinDate, rentInPaise, depositInPaise,
+                            govtFrontPath ?: "", govtBackPath ?: "", profilePhotoPath ?: ""
                         )
                         if (isSuccess) onBackClick()
                     }
@@ -311,8 +342,12 @@ fun AddResidentScreen(
                     showJoinDatePicker = false
                 }) { Text("OK") }
             },
-            dismissButton = { TextButton(onClick = { showJoinDatePicker = false }) { Text("Cancel") } }
-        ) { DatePicker(state = joinDatePickerState) }
+            dismissButton = {
+                TextButton(onClick = { showJoinDatePicker = false }) { Text("Cancel") }
+            }
+        ) {
+            DatePicker(state = joinDatePickerState)
+        }
     }
 
     if (showDobDatePicker) {
@@ -327,7 +362,11 @@ fun AddResidentScreen(
                     showDobDatePicker = false
                 }) { Text("OK") }
             },
-            dismissButton = { TextButton(onClick = { showDobDatePicker = false }) { Text("Cancel") } }
-        ) { DatePicker(state = dobDatePickerState) }
+            dismissButton = {
+                TextButton(onClick = { showDobDatePicker = false }) { Text("Cancel") }
+            }
+        ) {
+            DatePicker(state = dobDatePickerState)
+        }
     }
 }

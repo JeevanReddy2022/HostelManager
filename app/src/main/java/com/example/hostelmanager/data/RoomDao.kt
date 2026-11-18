@@ -1,6 +1,7 @@
 package com.example.hostelmanager.data
 
 import androidx.room.Dao
+import androidx.room.Delete
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
@@ -9,11 +10,16 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface RoomDao {
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertRoom(room: RoomEntity)
 
     @Update
     suspend fun updateRoom(room: RoomEntity)
+
+    // NEW: permanently erase a room (only safe when nothing references it)
+    @Delete
+    suspend fun deleteRoom(room: RoomEntity)
 
     @Query("""
         SELECT rooms.*, 
@@ -26,7 +32,6 @@ interface RoomDao {
     @Query("SELECT * FROM rooms WHERE isArchived = 0 ORDER BY roomNumber ASC")
     fun getAllActiveRooms(): Flow<List<RoomEntity>>
 
-    // NEW: Find a specific room by its ID
     @Query("SELECT * FROM rooms WHERE id = :id")
     fun getRoomById(id: String): Flow<RoomEntity?>
 }

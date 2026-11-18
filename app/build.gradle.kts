@@ -66,4 +66,7 @@ dependencies {
 
     //To move between screens in Android, we use a library called Navigation.
     implementation("androidx.navigation:navigation-compose:2.7.7")
+
+    //Coil is a small library that displays images (thumbnails, previews) easily.
+    implementation("io.coil-kt:coil-compose:2.6.0")
 }

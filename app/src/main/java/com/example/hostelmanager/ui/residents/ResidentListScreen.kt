@@ -2,6 +2,7 @@ package com.example.hostelmanager.ui.residents
 
 import android.content.Intent
 import android.net.Uri
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -16,7 +17,6 @@ import androidx.compose.material.icons.filled.Call
 import androidx.compose.material.icons.filled.Message
 import androidx.compose.material.icons.filled.PersonAdd
 import androidx.compose.material3.Card
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -33,11 +33,11 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.hostelmanager.data.ResidentWithRoom
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ResidentListScreen(
     hostelId: String,
     onAddClick: () -> Unit,
+    onResidentClick: (String) -> Unit,
     modifier: Modifier = Modifier,
     viewModel: ResidentListViewModel = viewModel()
 ) {
@@ -48,9 +48,12 @@ fun ResidentListScreen(
     val residents by viewModel.residents.collectAsState()
 
     Box(modifier = modifier.fillMaxSize()) {
+
         if (residents.isEmpty()) {
             Column(
-                modifier = Modifier.fillMaxSize().padding(16.dp),
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(16.dp),
                 verticalArrangement = Arrangement.Center
             ) {
                 Text("No active residents in this hostel.", style = MaterialTheme.typography.titleMedium)
@@ -61,11 +64,14 @@ fun ResidentListScreen(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(horizontal = 16.dp)
-                    .padding(bottom = 80.dp),
+                    .padding(bottom = 88.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 items(residents) { residentWithRoom ->
-                    ResidentCard(residentWithRoom)
+                    ResidentCard(
+                        residentWithRoom,
+                        onClick = { onResidentClick(residentWithRoom.person.id) }
+                    )
                 }
             }
         }
@@ -75,7 +81,6 @@ fun ResidentListScreen(
             modifier = Modifier
                 .align(Alignment.BottomEnd)
                 .padding(16.dp)
-                .padding(bottom = 70.dp)
         ) {
             Icon(Icons.Default.PersonAdd, contentDescription = "Add Resident")
         }
@@ -83,27 +88,29 @@ fun ResidentListScreen(
 }
 
 @Composable
-fun ResidentCard(residentWithRoom: ResidentWithRoom) {
+fun ResidentCard(residentWithRoom: ResidentWithRoom, onClick: () -> Unit) {
     val person = residentWithRoom.person
-    val context = LocalContext.current // Gives us access to the phone's capabilities
+    val context = LocalContext.current
 
-    Card(modifier = Modifier.fillMaxWidth()) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onClick() }
+    ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(16.dp),
-            horizontalArrangement = Arrangement.SpaceBetween, // Pushes text to left, icons to right
+            horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // LEFT SIDE: Name and Room
             Column(modifier = Modifier.weight(1f)) {
                 Text(person.name, style = MaterialTheme.typography.titleLarge)
                 Text("🛏️ Room: ${residentWithRoom.roomNumber}", style = MaterialTheme.typography.bodyMedium)
+                Text("💰 Rent: ₹${residentWithRoom.monthlyRent / 100}", style = MaterialTheme.typography.bodyMedium)
             }
 
-            // RIGHT SIDE: Call and Message Icons
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                // Call Button
                 IconButton(
                     onClick = {
                         val intent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:${person.phone}"))
@@ -117,7 +124,6 @@ fun ResidentCard(residentWithRoom: ResidentWithRoom) {
                     )
                 }
 
-                // Message Button
                 IconButton(
                     onClick = {
                         val intent = Intent(Intent.ACTION_SENDTO, Uri.parse("smsto:${person.phone}"))

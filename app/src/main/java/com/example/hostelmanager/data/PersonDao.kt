@@ -9,6 +9,7 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface PersonDao {
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertPerson(person: Person)
 
@@ -21,10 +22,13 @@ interface PersonDao {
     @Query("SELECT * FROM persons WHERE id = :id")
     suspend fun getPersonById(id: String): Person?
 
+    @Query("SELECT * FROM persons WHERE id = :id")
+    fun getPersonByIdFlow(id: String): Flow<Person?>
+
     @Query("""
         SELECT p.id, p.name, p.phone, p.govtIdNumber, p.emergencyContact, p.dateOfBirth, 
-               p.address, p.gender, p.guardianName, p.govtIdPhotoPath, p.profilePhotoPath, 
-               p.createdAt, p.updatedAt, r.roomNumber 
+               p.address, p.gender, p.guardianName, p.govtIdPhotoPath, p.govtIdBackPath, p.profilePhotoPath, 
+               p.createdAt, p.updatedAt, r.roomNumber, s.monthlyRent
         FROM persons p 
         INNER JOIN stays s ON p.id = s.personId 
         INNER JOIN rooms r ON s.roomId = r.id 
@@ -33,11 +37,10 @@ interface PersonDao {
     """)
     fun getActiveResidentsByHostel(hostelId: String): Flow<List<ResidentWithRoom>>
 
-    // NEW: Find residents in a specific room
     @Query("""
         SELECT p.id, p.name, p.phone, p.govtIdNumber, p.emergencyContact, p.dateOfBirth, 
-               p.address, p.gender, p.guardianName, p.govtIdPhotoPath, p.profilePhotoPath, 
-               p.createdAt, p.updatedAt, r.roomNumber 
+               p.address, p.gender, p.guardianName, p.govtIdPhotoPath, p.govtIdBackPath, p.profilePhotoPath, 
+               p.createdAt, p.updatedAt, r.roomNumber, s.monthlyRent
         FROM persons p 
         INNER JOIN stays s ON p.id = s.personId 
         INNER JOIN rooms r ON s.roomId = r.id 
@@ -54,4 +57,14 @@ interface PersonDao {
 
     @Query("SELECT COUNT(*) FROM persons p INNER JOIN stays s ON p.id = s.personId WHERE s.isActive = 1 AND p.emergencyContact = :emergency")
     suspend fun isEmergencyDuplicate(emergency: String): Boolean
+
+    // NEW: same checks, but ignore the resident currently being edited
+    @Query("SELECT COUNT(*) FROM persons p INNER JOIN stays s ON p.id = s.personId WHERE s.isActive = 1 AND p.phone = :phone AND p.id != :excludePersonId")
+    suspend fun isPhoneDuplicateExcluding(phone: String, excludePersonId: String): Boolean
+
+    @Query("SELECT COUNT(*) FROM persons p INNER JOIN stays s ON p.id = s.personId WHERE s.isActive = 1 AND p.govtIdNumber = :govtId AND p.id != :excludePersonId")
+    suspend fun isGovtIdDuplicateExcluding(govtId: String, excludePersonId: String): Boolean
+
+    @Query("SELECT COUNT(*) FROM persons p INNER JOIN stays s ON p.id = s.personId WHERE s.isActive = 1 AND p.emergencyContact = :emergency AND p.id != :excludePersonId")
+    suspend fun isEmergencyDuplicateExcluding(emergency: String, excludePersonId: String): Boolean
 }

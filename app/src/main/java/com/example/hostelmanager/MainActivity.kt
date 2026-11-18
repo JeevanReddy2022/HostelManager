@@ -13,6 +13,8 @@ import androidx.navigation.navArgument
 import com.example.hostelmanager.ui.dashboard.HostelDashboardScreen
 import com.example.hostelmanager.ui.hostels.HostelListScreen
 import com.example.hostelmanager.ui.residents.AddResidentScreen
+import com.example.hostelmanager.ui.residents.EditResidentScreen
+import com.example.hostelmanager.ui.residents.ResidentDetailsScreen
 import com.example.hostelmanager.ui.residents.ResidentViewModel
 import com.example.hostelmanager.ui.rooms.RoomDetailsScreen
 import com.example.hostelmanager.ui.theme.HostelManagerTheme
@@ -45,7 +47,8 @@ class MainActivity : ComponentActivity() {
                             hostelId = hostelId,
                             onBackClick = { navController.popBackStack() },
                             onAddResidentClick = { navController.navigate("add_resident/$hostelId") },
-                            onRoomClick = { roomId -> navController.navigate("room_details/$hostelId/$roomId") }
+                            onRoomClick = { roomId -> navController.navigate("room_details/$hostelId/$roomId") },
+                            onResidentClick = { personId -> navController.navigate("resident_details/$personId") }
                         )
                     }
 
@@ -60,7 +63,6 @@ class MainActivity : ComponentActivity() {
                         )
                     }
 
-                    // NEW: Room Details Screen Route
                     composable(
                         route = "room_details/{hostelId}/{roomId}",
                         arguments = listOf(
@@ -71,6 +73,31 @@ class MainActivity : ComponentActivity() {
                         val roomId = backStackEntry.arguments?.getString("roomId") ?: ""
                         RoomDetailsScreen(
                             roomId = roomId,
+                            onBackClick = { navController.popBackStack() },
+                            onResidentClick = { personId -> navController.navigate("resident_details/$personId") }
+                        )
+                    }
+
+                    composable(
+                        route = "resident_details/{personId}",
+                        arguments = listOf(navArgument("personId") { type = NavType.StringType })
+                    ) { backStackEntry ->
+                        val personId = backStackEntry.arguments?.getString("personId") ?: ""
+                        ResidentDetailsScreen(
+                            personId = personId,
+                            onBackClick = { navController.popBackStack() },
+                            onEditClick = { navController.navigate("edit_resident/$personId") }
+                        )
+                    }
+
+                    // NEW: Edit Resident screen
+                    composable(
+                        route = "edit_resident/{personId}",
+                        arguments = listOf(navArgument("personId") { type = NavType.StringType })
+                    ) { backStackEntry ->
+                        val personId = backStackEntry.arguments?.getString("personId") ?: ""
+                        EditResidentScreen(
+                            personId = personId,
                             onBackClick = { navController.popBackStack() }
                         )
                     }
