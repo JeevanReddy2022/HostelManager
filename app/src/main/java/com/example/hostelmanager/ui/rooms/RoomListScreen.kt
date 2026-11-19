@@ -22,12 +22,14 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.hostelmanager.data.RoomWithOccupancy
+import kotlinx.coroutines.launch
 
 @Composable
 fun RoomListScreen(
@@ -41,10 +43,11 @@ fun RoomListScreen(
     }
 
     val roomsWithOccupancy by viewModel.roomsWithOccupancy.collectAsState()
+    val roomError by viewModel.roomExistsError.collectAsState()
     var showAddDialog by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
 
     Box(modifier = modifier.fillMaxSize()) {
-
         if (roomsWithOccupancy.isEmpty()) {
             Column(
                 modifier = Modifier
@@ -70,7 +73,10 @@ fun RoomListScreen(
         }
 
         FloatingActionButton(
-            onClick = { showAddDialog = true },
+            onClick = {
+                viewModel.clearRoomError()
+                showAddDialog = true
+            },
             modifier = Modifier
                 .align(Alignment.BottomEnd)
                 .padding(16.dp)
@@ -81,10 +87,18 @@ fun RoomListScreen(
 
     if (showAddDialog) {
         AddRoomDialog(
-            onDismiss = { showAddDialog = false },
-            onConfirm = { number, floor, beds, rent ->
-                viewModel.addRoom(number, floor, beds, rent)
+            onDismiss = {
+                viewModel.clearRoomError()
                 showAddDialog = false
+            },
+            errorMessage = roomError,
+            onErrorCleared = { viewModel.clearRoomError() },
+            onConfirm = { number, floor, beds, rent ->
+                scope.launch {
+                    val success = viewModel.tryAddRoom(number, floor, beds, rent)
+                    if (success) showAddDialog = false
+                    // If not successful, the dialog stays open with the error shown
+                }
             }
         )
     }

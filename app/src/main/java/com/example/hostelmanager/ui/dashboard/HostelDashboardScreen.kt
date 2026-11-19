@@ -2,6 +2,7 @@ package com.example.hostelmanager.ui.dashboard
 
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Archive
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.People
@@ -29,7 +30,9 @@ fun HostelDashboardScreen(
     onBackClick: () -> Unit,
     onAddResidentClick: () -> Unit,
     onRoomClick: (String) -> Unit,
-    onResidentClick: (String) -> Unit
+    onResidentClick: (String) -> Unit,
+    onArchivedRoomsClick: () -> Unit,
+    onPastResidentsClick: () -> Unit
 ) {
     var selectedTab by remember { mutableIntStateOf(0) }
 
@@ -43,6 +46,17 @@ fun HostelDashboardScreen(
                 navigationIcon = {
                     IconButton(onClick = onBackClick) {
                         Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+                    }
+                },
+                actions = {
+                    if (selectedTab == 0) {
+                        IconButton(onClick = onArchivedRoomsClick) {
+                            Icon(Icons.Default.Archive, contentDescription = "Archived Rooms")
+                        }
+                    } else if (selectedTab == 1) {
+                        IconButton(onClick = onPastResidentsClick) {
+                            Icon(Icons.Default.Archive, contentDescription = "Past Residents")
+                        }
                     }
                 }
             )

@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -19,7 +20,9 @@ import androidx.compose.ui.unit.dp
 @Composable
 fun AddRoomDialog(
     onDismiss: () -> Unit,
-    onConfirm: (roomNumber: String, floor: Int, bedCount: Int, rentPerBed: Long) -> Unit
+    onConfirm: (roomNumber: String, floor: Int, bedCount: Int, rentPerBed: Long) -> Unit,
+    errorMessage: String? = null,
+    onErrorCleared: () -> Unit = {}
 ) {
     var roomNumber by remember { mutableStateOf("") }
     var floor by remember { mutableStateOf("1") }
@@ -35,10 +38,17 @@ fun AddRoomDialog(
             Column {
                 OutlinedTextField(
                     value = roomNumber,
-                    onValueChange = { roomNumber = it },
+                    onValueChange = {
+                        roomNumber = it
+                        onErrorCleared()   // clear any previous error when they type
+                    },
                     label = { Text("Room Number *") },
                     modifier = Modifier.fillMaxWidth(),
-                    singleLine = true
+                    singleLine = true,
+                    isError = errorMessage != null,
+                    supportingText = {
+                        if (errorMessage != null) Text(errorMessage)
+                    }
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 OutlinedTextField(
@@ -69,7 +79,6 @@ fun AddRoomDialog(
         confirmButton = {
             TextButton(
                 onClick = {
-                    // Convert rupees typed by user into paise for the database
                     val rentInPaise = rent.toLongOrNull()?.times(100) ?: 0L
                     onConfirm(
                         roomNumber,
@@ -78,7 +87,7 @@ fun AddRoomDialog(
                         rentInPaise
                     )
                 },
-                enabled = isInputValid
+                enabled = isInputValid && errorMessage == null
             ) {
                 Text("Add")
             }

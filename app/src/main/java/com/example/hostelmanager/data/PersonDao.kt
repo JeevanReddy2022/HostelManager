@@ -49,6 +49,28 @@ interface PersonDao {
     """)
     fun getActiveResidentsByRoom(roomId: String): Flow<List<ResidentWithRoom>>
 
+    // NEW: people who have checked out (no active stay in this hostel)
+    @Query("""
+        SELECT p.id, p.name, p.phone, p.govtIdNumber, p.emergencyContact, p.dateOfBirth, 
+               p.address, p.gender, p.guardianName, p.govtIdPhotoPath, p.govtIdBackPath, p.profilePhotoPath, 
+               p.createdAt, p.updatedAt,
+               (SELECT r.roomNumber FROM stays s2 INNER JOIN rooms r ON s2.roomId = r.id 
+                WHERE s2.personId = p.id AND s2.hostelId = :hostelId 
+                ORDER BY s2.joinDate DESC LIMIT 1) AS roomNumber,
+               (SELECT s3.monthlyRent FROM stays s3 
+                WHERE s3.personId = p.id AND s3.hostelId = :hostelId 
+                ORDER BY s3.joinDate DESC LIMIT 1) AS monthlyRent
+        FROM persons p
+        WHERE p.id IN (
+            SELECT personId FROM stays WHERE hostelId = :hostelId
+        )
+        AND p.id NOT IN (
+            SELECT personId FROM stays WHERE hostelId = :hostelId AND isActive = 1
+        )
+        ORDER BY p.name ASC
+    """)
+    fun getPastResidentsByHostel(hostelId: String): Flow<List<ResidentWithRoom>>
+
     @Query("SELECT COUNT(*) FROM persons p INNER JOIN stays s ON p.id = s.personId WHERE s.isActive = 1 AND p.phone = :phone")
     suspend fun isPhoneDuplicate(phone: String): Boolean
 
@@ -58,7 +80,6 @@ interface PersonDao {
     @Query("SELECT COUNT(*) FROM persons p INNER JOIN stays s ON p.id = s.personId WHERE s.isActive = 1 AND p.emergencyContact = :emergency")
     suspend fun isEmergencyDuplicate(emergency: String): Boolean
 
-    // NEW: same checks, but ignore the resident currently being edited
     @Query("SELECT COUNT(*) FROM persons p INNER JOIN stays s ON p.id = s.personId WHERE s.isActive = 1 AND p.phone = :phone AND p.id != :excludePersonId")
     suspend fun isPhoneDuplicateExcluding(phone: String, excludePersonId: String): Boolean
 

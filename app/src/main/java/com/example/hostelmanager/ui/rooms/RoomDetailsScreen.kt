@@ -6,9 +6,12 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
@@ -40,6 +43,11 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.hostelmanager.data.ResidentWithRoom
+import com.example.hostelmanager.ui.residents.ResidentAvatar
+import java.net.URLEncoder
+import java.time.LocalDate
+import java.time.format.TextStyle
+import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -64,7 +72,6 @@ fun RoomDetailsScreen(
     var showArchiveDialog by remember { mutableStateOf(false) }
     var showDeleteDialog by remember { mutableStateOf(false) }
 
-    // Once the room is archived or deleted, go back to the Rooms list
     LaunchedEffect(roomRemoved) {
         if (roomRemoved) onBackClick()
     }
@@ -113,7 +120,6 @@ fun RoomDetailsScreen(
                                 )
                             }
                             IconButton(onClick = {
-                                // Decide: refuse, archive, or hard-delete
                                 if (residents.isNotEmpty()) {
                                     showOccupiedDialog = true
                                 } else if (totalStays > 0) {
@@ -124,7 +130,7 @@ fun RoomDetailsScreen(
                             }) {
                                 Icon(
                                     Icons.Default.Delete,
-                                    contentDescription = "Remove Room",
+                                    contentDescription = "Delete Room",
                                     tint = MaterialTheme.colorScheme.error
                                 )
                             }
@@ -155,7 +161,7 @@ fun RoomDetailsScreen(
 
     val currentRoom = room
 
-    // Edit Room popup
+    // 1. EDIT DIALOG
     if (showEditDialog && currentRoom != null) {
         EditRoomDialog(
             room = currentRoom,
@@ -168,7 +174,7 @@ fun RoomDetailsScreen(
         )
     }
 
-    // Rent revision popup
+    // 2. RENT REVISION DIALOG
     val prompt = rentPrompt
     if (prompt != null) {
         AlertDialog(
@@ -194,7 +200,7 @@ fun RoomDetailsScreen(
         )
     }
 
-    // 1) REFUSE: residents still live here
+    // 3. OCCUPIED DIALOG (Refuse deletion)
     if (showOccupiedDialog && currentRoom != null) {
         AlertDialog(
             onDismissRequest = { showOccupiedDialog = false },
@@ -213,7 +219,7 @@ fun RoomDetailsScreen(
         )
     }
 
-    // 2) ARCHIVE: empty now, but used before -> keep history
+    // 4. ARCHIVE DIALOG (Hide used room)
     if (showArchiveDialog && currentRoom != null) {
         AlertDialog(
             onDismissRequest = { showArchiveDialog = false },
@@ -236,7 +242,7 @@ fun RoomDetailsScreen(
         )
     }
 
-    // 3) HARD DELETE: never used -> gone for good
+    // 5. DELETE DIALOG (Permanently erase unused room)
     if (showDeleteDialog && currentRoom != null) {
         AlertDialog(
             onDismissRequest = { showDeleteDialog = false },
@@ -264,6 +270,7 @@ fun RoomDetailsScreen(
 fun ResidentDetailCard(residentWithRoom: ResidentWithRoom, onClick: () -> Unit) {
     val person = residentWithRoom.person
     val context = LocalContext.current
+    var showMessageDialog by remember { mutableStateOf(false) }
 
     Card(
         modifier = Modifier
@@ -271,29 +278,103 @@ fun ResidentDetailCard(residentWithRoom: ResidentWithRoom, onClick: () -> Unit) 
             .clickable { onClick() }
     ) {
         Row(
-            modifier = Modifier.fillMaxWidth().padding(16.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
+            // ✅ 1. RESIDENT PHOTO ON THE LEFT
+            ResidentAvatar(photoPath = person.profilePhotoPath)
+
+            Spacer(modifier = Modifier.width(12.dp))
+
+            // MIDDLE: Name, phone, rent
             Column(modifier = Modifier.weight(1f)) {
-                Text(person.name, style = MaterialTheme.typography.titleLarge)
+                Text(person.name, style = MaterialTheme.typography.titleMedium)
                 Text("📞 ${person.phone}", style = MaterialTheme.typography.bodyMedium)
                 Text("💰 Rent: ₹${residentWithRoom.monthlyRent / 100}", style = MaterialTheme.typography.bodyMedium)
             }
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+
+            // RIGHT: Call + Message buttons
+            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                 IconButton(onClick = {
                     val intent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:${person.phone}"))
                     context.startActivity(intent)
                 }) {
                     Icon(Icons.Default.Call, contentDescription = "Call", tint = MaterialTheme.colorScheme.primary)
                 }
-                IconButton(onClick = {
-                    val intent = Intent(Intent.ACTION_SENDTO, Uri.parse("smsto:${person.phone}"))
-                    context.startActivity(intent)
-                }) {
+                IconButton(onClick = { showMessageDialog = true }) {
                     Icon(Icons.Default.Message, contentDescription = "Message", tint = MaterialTheme.colorScheme.primary)
                 }
             }
         }
     }
+
+    // ✅ 2. WHATSAPP / SMS CHOICE DIALOG
+    if (showMessageDialog) {
+        val rentAmount = residentWithRoom.monthlyRent / 100
+
+        MessageChoiceDialog(
+            personName = person.name,
+            phone = person.phone,
+            rentAmount = rentAmount,
+            onDismiss = { showMessageDialog = false },
+            onWhatsAppClick = {
+                val monthName = LocalDate.now().month.getDisplayName(TextStyle.FULL, Locale.getDefault())
+                val message = "Hi ${person.name},\nPlease pay the rent ₹$rentAmount for $monthName.\nThanks!"
+                val whatsappNumber = "91${person.phone}"
+                val encodedMessage = URLEncoder.encode(message, "UTF-8")
+                val whatsappUri = Uri.parse("https://wa.me/$whatsappNumber?text=$encodedMessage")
+                val intent = Intent(Intent.ACTION_VIEW, whatsappUri)
+                context.startActivity(intent)
+                showMessageDialog = false
+            },
+            onSmsClick = {
+                val monthName = LocalDate.now().month.getDisplayName(TextStyle.FULL, Locale.getDefault())
+                val message = "Hi ${person.name},\nPlease pay the rent ₹$rentAmount for $monthName.\nThanks!"
+                val intent = Intent(Intent.ACTION_SENDTO, Uri.parse("smsto:${person.phone}"))
+                intent.putExtra("sms_body", message)
+                context.startActivity(intent)
+                showMessageDialog = false
+            }
+        )
+    }
+}
+
+@Composable
+fun MessageChoiceDialog(
+    personName: String,
+    phone: String,
+    rentAmount: Long,
+    onDismiss: () -> Unit,
+    onWhatsAppClick: () -> Unit,
+    onSmsClick: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Send Message") },
+        text = {
+            Column {
+                Text("Choose how to send the rent reminder to $personName:")
+                Spacer(modifier = Modifier.height(16.dp))
+                TextButton(
+                    onClick = onWhatsAppClick,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("💬 WhatsApp")
+                }
+                TextButton(
+                    onClick = onSmsClick,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("📱 SMS")
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel")
+            }
+        }
+    )
 }

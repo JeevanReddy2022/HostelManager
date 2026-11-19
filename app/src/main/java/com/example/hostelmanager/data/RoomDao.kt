@@ -17,7 +17,6 @@ interface RoomDao {
     @Update
     suspend fun updateRoom(room: RoomEntity)
 
-    // NEW: permanently erase a room (only safe when nothing references it)
     @Delete
     suspend fun deleteRoom(room: RoomEntity)
 
@@ -34,4 +33,11 @@ interface RoomDao {
 
     @Query("SELECT * FROM rooms WHERE id = :id")
     fun getRoomById(id: String): Flow<RoomEntity?>
+
+    @Query("SELECT * FROM rooms WHERE hostelId = :hostelId AND isArchived = 1 ORDER BY roomNumber ASC")
+    fun getArchivedRooms(hostelId: String): Flow<List<RoomEntity>>
+
+    // NEW: counts rooms with this number in this hostel (active + archived)
+    @Query("SELECT COUNT(*) FROM rooms WHERE hostelId = :hostelId AND roomNumber = :roomNumber")
+    suspend fun countRoomsWithNumber(hostelId: String, roomNumber: String): Int
 }
