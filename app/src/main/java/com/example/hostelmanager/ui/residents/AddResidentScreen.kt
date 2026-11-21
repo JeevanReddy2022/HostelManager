@@ -122,11 +122,15 @@ fun AddResidentScreen(
         else -> false
     }
 
-    // Both ID photos are required
+    // NEW: Validation to ensure phone and emergency contact are not the same
+    val isSameContact = phone.isNotBlank() && emergency.isNotBlank() && phone == emergency
+
+    // Both ID photos are required, and contacts must not match
     val isFormValid = name.isNotBlank() && isPhoneValid && isIdValid && isEmergencyValid &&
             selectedRoom != null && joinDate.isNotBlank() && dob.isNotBlank() &&
             rent.isNotBlank() && deposit.isNotBlank() &&
-            !govtFrontPath.isNullOrBlank() && !govtBackPath.isNullOrBlank()
+            !govtFrontPath.isNullOrBlank() && !govtBackPath.isNullOrBlank() &&
+            !isSameContact
 
     Scaffold(
         topBar = {
@@ -198,10 +202,16 @@ fun AddResidentScreen(
                 value = emergency, onValueChange = { emergency = it },
                 label = { Text("Emergency Contact (10 digits) *") },
                 modifier = Modifier.fillMaxWidth(),
-                isError = (emergency.isNotBlank() && !isEmergencyValid) || emergencyError != null,
+                // UPDATED: Added isSameContact to the error state
+                isError = (emergency.isNotBlank() && !isEmergencyValid) || emergencyError != null || isSameContact,
                 supportingText = {
-                    if (emergency.isNotBlank() && !isEmergencyValid) Text("Must be exactly 10 digits")
-                    else if (emergencyError != null) Text(emergencyError!!)
+                    if (isSameContact) {
+                        Text("Emergency contact cannot be the same as the primary phone number", color = MaterialTheme.colorScheme.error)
+                    } else if (emergency.isNotBlank() && !isEmergencyValid) {
+                        Text("Must be exactly 10 digits")
+                    } else if (emergencyError != null) {
+                        Text(emergencyError!!)
+                    }
                 }
             )
 
@@ -285,7 +295,6 @@ fun AddResidentScreen(
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
             )
 
-            // MOVED: Documents & Photo now sits at the end, right before Save
             Spacer(modifier = Modifier.height(16.dp))
             Text("Documents & Photo", style = MaterialTheme.typography.titleMedium)
 

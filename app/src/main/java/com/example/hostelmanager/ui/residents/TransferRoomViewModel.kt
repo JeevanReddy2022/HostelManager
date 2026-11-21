@@ -32,7 +32,6 @@ class TransferRoomViewModel(application: Application) : AndroidViewModel(applica
         if (id.isEmpty()) flowOf(null) else stayDao.getActiveStayByPerson(id)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
 
-    // person -> active stay -> that room
     val currentRoom: StateFlow<RoomEntity?> = _personId.flatMapLatest { id ->
         if (id.isEmpty()) flowOf(null)
         else stayDao.getActiveStayByPerson(id).flatMapLatest { stay ->
@@ -40,7 +39,6 @@ class TransferRoomViewModel(application: Application) : AndroidViewModel(applica
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
 
-    // person -> active stay -> that hostel's rooms
     val availableRooms: StateFlow<List<RoomWithOccupancy>> = _personId.flatMapLatest { id ->
         if (id.isEmpty()) flowOf(emptyList())
         else stayDao.getActiveStayByPerson(id).flatMapLatest { stay ->
@@ -67,7 +65,6 @@ class TransferRoomViewModel(application: Application) : AndroidViewModel(applica
             return false
         }
 
-        // Re-check the target room is still free (safety against stale UI)
         val target = availableRooms.value.firstOrNull { it.room.id == newRoomId }
         if (target == null) {
             _transferError.value = "That room is no longer available."
@@ -78,13 +75,12 @@ class TransferRoomViewModel(application: Application) : AndroidViewModel(applica
             return false
         }
 
-        // Dates are stored as YYYY-MM-DD, so text comparison works correctly
         if (transferDate < stay.joinDate) {
             _transferError.value = "Transfer date cannot be before the join date (${stay.joinDate})."
             return false
         }
 
-        // 1) CLOSE the old stay — history is kept, not deleted
+        // Close the old stay (history kept)
         stayDao.updateStay(
             stay.copy(
                 isActive = false,
@@ -93,7 +89,7 @@ class TransferRoomViewModel(application: Application) : AndroidViewModel(applica
             )
         )
 
-        // 2) OPEN a new stay in the new room; deposit carries over
+        // NEW: carry the billing anchor day forward to the new stay
         stayDao.insertStay(
             Stay(
                 personId = stay.personId,
@@ -102,6 +98,7 @@ class TransferRoomViewModel(application: Application) : AndroidViewModel(applica
                 joinDate = transferDate,
                 monthlyRent = newRentPaise,
                 depositCollected = stay.depositCollected,
+                billingAnchorDay = stay.billingAnchorDay,
                 isActive = true
             )
         )

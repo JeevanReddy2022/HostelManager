@@ -43,6 +43,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
+import com.example.hostelmanager.data.Payment
 import java.io.File
 import java.net.URLEncoder
 import java.time.LocalDate
@@ -66,6 +67,7 @@ fun ResidentDetailsScreen(
     val person by viewModel.person.collectAsState()
     val activeStay by viewModel.activeStay.collectAsState()
     val room by viewModel.room.collectAsState()
+    val payments by viewModel.payments.collectAsState()
     val context = LocalContext.current
 
     var showEditConfirmDialog by remember { mutableStateOf(false) }
@@ -164,7 +166,6 @@ fun ResidentDetailsScreen(
 
                             Spacer(Modifier.height(16.dp))
 
-                            // TRANSFER ROOM — OutlinedButton (clear border, secondary action)
                             OutlinedButton(
                                 onClick = onTransferClick,
                                 modifier = Modifier.fillMaxWidth()
@@ -174,7 +175,6 @@ fun ResidentDetailsScreen(
 
                             Spacer(Modifier.height(8.dp))
 
-                            // CHECK OUT — filled Button with error color (destructive, stands out)
                             Button(
                                 onClick = onCheckoutClick,
                                 modifier = Modifier.fillMaxWidth(),
@@ -192,6 +192,24 @@ fun ResidentDetailsScreen(
                 Text("Govt ID Documents", style = MaterialTheme.typography.titleMedium)
                 DocumentImage("Front", currentPerson.govtIdPhotoPath)
                 DocumentImage("Back", currentPerson.govtIdBackPath)
+
+                // NEW: Payment History section
+                Text("Payment History", style = MaterialTheme.typography.titleMedium)
+                if (payments.isEmpty()) {
+                    Card(modifier = Modifier.fillMaxWidth()) {
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            Text(
+                                "No payments recorded yet.",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                } else {
+                    payments.forEach { payment ->
+                        PaymentHistoryCard(payment)
+                    }
+                }
             }
         }
     }
@@ -279,6 +297,36 @@ private fun DocumentImage(label: String, path: String?) {
                     contentScale = ContentScale.Fit
                 )
             }
+        }
+    }
+}
+
+// NEW: Compact payment card for the resident details screen
+@Composable
+private fun PaymentHistoryCard(payment: Payment) {
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(payment.date, style = MaterialTheme.typography.bodyMedium)
+                Text(payment.mode, style = MaterialTheme.typography.bodySmall)
+                if (payment.note.isNotBlank()) {
+                    Text(
+                        payment.note,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+            Text(
+                "₹${payment.amountPaise / 100}",
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.primary
+            )
         }
     }
 }

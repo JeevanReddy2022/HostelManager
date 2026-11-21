@@ -4,6 +4,7 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.hostelmanager.data.AppDatabase
+import com.example.hostelmanager.data.Payment
 import com.example.hostelmanager.data.Person
 import com.example.hostelmanager.data.RoomEntity
 import com.example.hostelmanager.data.Stay
@@ -20,6 +21,7 @@ class ResidentDetailsViewModel(application: Application) : AndroidViewModel(appl
     private val personDao = db.personDao()
     private val stayDao = db.stayDao()
     private val roomDao = db.roomDao()
+    private val paymentDao = db.paymentDao()
 
     private val _personId = MutableStateFlow("")
 
@@ -31,13 +33,15 @@ class ResidentDetailsViewModel(application: Application) : AndroidViewModel(appl
         if (id.isEmpty()) flowOf(null) else stayDao.getActiveStayByPerson(id)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
 
-    // The room of the active stay: person -> active stay -> room
-    val room: StateFlow<RoomEntity?> = _personId.flatMapLatest { id ->
-        if (id.isEmpty()) flowOf(null)
-        else stayDao.getActiveStayByPerson(id).flatMapLatest { stay ->
-            if (stay == null) flowOf(null) else roomDao.getRoomById(stay.roomId)
-        }
+    val room: StateFlow<RoomEntity?> = activeStay.flatMapLatest { stay ->
+        if (stay == null) flowOf(null) else roomDao.getRoomById(stay.roomId)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
+
+    // NEW: all payments for this person (across all their stays)
+    val payments: StateFlow<List<Payment>> = _personId.flatMapLatest { id ->
+        if (id.isEmpty()) flowOf(emptyList())
+        else paymentDao.getPaymentsForPerson(id)
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     fun setPersonId(id: String) {
         _personId.value = id

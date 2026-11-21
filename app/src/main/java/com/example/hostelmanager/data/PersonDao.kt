@@ -88,4 +88,21 @@ interface PersonDao {
 
     @Query("SELECT COUNT(*) FROM persons p INNER JOIN stays s ON p.id = s.personId WHERE s.isActive = 1 AND p.emergencyContact = :emergency AND p.id != :excludePersonId")
     suspend fun isEmergencyDuplicateExcluding(emergency: String, excludePersonId: String): Boolean
+    // NEW: all residents (active + checked out) with their most recent stay in this hostel
+    @Query("""
+        SELECT p.id AS personId, p.name, p.phone, p.profilePhotoPath, 
+               r.roomNumber, s.monthlyRent, s.id AS stayId, 
+               s.isActive, s.checkoutDate, s.billingAnchorDay
+        FROM persons p
+        INNER JOIN stays s ON p.id = s.personId
+        INNER JOIN rooms r ON s.roomId = r.id
+        WHERE s.hostelId = :hostelId
+          AND s.id = (
+            SELECT s2.id FROM stays s2 
+            WHERE s2.personId = p.id AND s2.hostelId = :hostelId
+            ORDER BY s2.joinDate DESC LIMIT 1
+          )
+        ORDER BY p.name ASC
+    """)
+    fun getAllResidentsWithLatestStay(hostelId: String): Flow<List<ResidentWithStayInfo>>
 }

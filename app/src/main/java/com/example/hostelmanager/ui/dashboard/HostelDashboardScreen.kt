@@ -5,7 +5,9 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Archive
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Payments
 import androidx.compose.material.icons.filled.People
+import androidx.compose.material.icons.filled.Receipt
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -18,8 +20,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import com.example.hostelmanager.ui.expenses.ExpensesListScreen
+import com.example.hostelmanager.ui.payments.PaymentsListScreen
 import com.example.hostelmanager.ui.residents.ResidentListScreen
 import com.example.hostelmanager.ui.rooms.RoomListScreen
 
@@ -32,12 +37,20 @@ fun HostelDashboardScreen(
     onRoomClick: (String) -> Unit,
     onResidentClick: (String) -> Unit,
     onArchivedRoomsClick: () -> Unit,
-    onPastResidentsClick: () -> Unit
+    onPastResidentsClick: () -> Unit,
+    onRecordPaymentClick: (String) -> Unit,
+    onPaymentHistoryClick: () -> Unit,
+    onAddExpenseClick: () -> Unit
 ) {
-    var selectedTab by remember { mutableIntStateOf(0) }
+    var selectedTab by rememberSaveable { mutableIntStateOf(0) }
 
-    val tabs = listOf("Rooms", "Residents")
-    val icons = listOf(Icons.Default.Home, Icons.Default.People)
+    val tabs = listOf("Rooms", "Residents", "Payments", "Expenses")
+    val icons = listOf(
+        Icons.Default.Home,
+        Icons.Default.People,
+        Icons.Default.Payments,
+        Icons.Default.Receipt
+    )
 
     Scaffold(
         topBar = {
@@ -84,6 +97,17 @@ fun HostelDashboardScreen(
                 hostelId = hostelId,
                 onAddClick = { onAddResidentClick() },
                 onResidentClick = { personId -> onResidentClick(personId) },
+                modifier = Modifier.padding(padding)
+            )
+            2 -> PaymentsListScreen(
+                hostelId = hostelId,
+                onRecordPaymentClick = { personId -> onRecordPaymentClick(personId) },
+                onPaymentHistoryClick = { onPaymentHistoryClick() },
+                modifier = Modifier.padding(padding)
+            )
+            3 -> ExpensesListScreen(
+                hostelId = hostelId,
+                onAddExpenseClick = { onAddExpenseClick() },
                 modifier = Modifier.padding(padding)
             )
         }

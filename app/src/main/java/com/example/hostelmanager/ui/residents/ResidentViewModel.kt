@@ -13,6 +13,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
 
 class ResidentViewModel(application: Application) : AndroidViewModel(application) {
 
@@ -81,6 +82,9 @@ class ResidentViewModel(application: Application) : AndroidViewModel(application
         )
         personDao.insertPerson(newPerson)
 
+        // NEW: extract day of month from joinDate ("YYYY-MM-DD" → day)
+        val anchorDay = joinDate.substring(8, 10).toIntOrNull() ?: 1
+
         val newStay = Stay(
             personId = newPerson.id,
             hostelId = hostelId,
@@ -88,6 +92,7 @@ class ResidentViewModel(application: Application) : AndroidViewModel(application
             joinDate = joinDate,
             monthlyRent = rentPaise,
             depositCollected = depositPaise,
+            billingAnchorDay = anchorDay,
             isActive = true
         )
         stayDao.insertStay(newStay)

@@ -17,6 +17,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 
+
 @Composable
 fun AddRoomDialog(
     onDismiss: () -> Unit,
@@ -29,62 +30,114 @@ fun AddRoomDialog(
     var bedCount by remember { mutableStateOf("1") }
     var rent by remember { mutableStateOf("") }
 
-    val isInputValid = roomNumber.isNotBlank() && rent.isNotBlank()
+    // Validation values
+    val roomNumberValid = roomNumber.isNotBlank() &&
+            (roomNumber.toLongOrNull()?.let { it > 0 } ?: true)
+
+    val floorValid = floor.toIntOrNull()?.let { it >= 0 } == true
+
+    val bedCountValid = bedCount.toIntOrNull()?.let { it > 0 } == true
+
+    val rentValue = rent.toLongOrNull()
+    val rentValid = rentValue != null && rentValue > 0
+
+    // Warning for low rent
+    val showRentWarning = rentValid && rentValue!! < 4000
+
+    val isInputValid = roomNumberValid &&
+            floorValid &&
+            bedCountValid &&
+            rentValid
 
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("Add Room") },
         text = {
             Column {
+                // Room Number
                 OutlinedTextField(
                     value = roomNumber,
                     onValueChange = {
                         roomNumber = it
-                        onErrorCleared()   // clear any previous error when they type
+                        onErrorCleared()
                     },
                     label = { Text("Room Number *") },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
-                    isError = errorMessage != null,
+                    isError = !roomNumberValid || errorMessage != null,
                     supportingText = {
-                        if (errorMessage != null) Text(errorMessage)
+                        when {
+                            errorMessage != null -> Text(errorMessage)
+                            !roomNumberValid -> Text("Room number must be greater than zero")
+                        }
                     }
                 )
+
                 Spacer(modifier = Modifier.height(8.dp))
+
+                // Floor
                 OutlinedTextField(
                     value = floor,
                     onValueChange = { floor = it },
                     label = { Text("Floor") },
                     modifier = Modifier.fillMaxWidth(),
-                    singleLine = true
+                    singleLine = true,
+                    isError = !floorValid,
+                    supportingText = {
+                        if (!floorValid) {
+                            Text("Floor cannot be negative or empty")
+                        }
+                    }
                 )
+
                 Spacer(modifier = Modifier.height(8.dp))
+
+                // Number of Beds
                 OutlinedTextField(
                     value = bedCount,
                     onValueChange = { bedCount = it },
                     label = { Text("Number of Beds") },
                     modifier = Modifier.fillMaxWidth(),
-                    singleLine = true
+                    singleLine = true,
+                    isError = !bedCountValid,
+                    supportingText = {
+                        if (!bedCountValid) {
+                            Text("Number of beds must be greater than zero")
+                        }
+                    }
                 )
+
                 Spacer(modifier = Modifier.height(8.dp))
+
+                // Rent
                 OutlinedTextField(
                     value = rent,
                     onValueChange = { rent = it },
                     label = { Text("Rent per Bed (₹)") },
                     modifier = Modifier.fillMaxWidth(),
-                    singleLine = true
+                    singleLine = true,
+                    isError = rent.isNotBlank() && !rentValid,
+                    supportingText = {
+                        when {
+                            rent.isBlank() -> Text("Enter rent per bed")
+                            !rentValid -> Text("Rent must be greater than zero")
+                            showRentWarning -> Text(
+                                text = "Warning: Rent is low (below ₹4,000)",
+                                color = MaterialTheme.colorScheme.error
+                            )
+                        }
+                    }
                 )
             }
         },
         confirmButton = {
             TextButton(
                 onClick = {
-                    val rentInPaise = rent.toLongOrNull()?.times(100) ?: 0L
                     onConfirm(
                         roomNumber,
-                        floor.toIntOrNull() ?: 1,
-                        bedCount.toIntOrNull() ?: 1,
-                        rentInPaise
+                        floor.toInt(),
+                        bedCount.toInt(),
+                        rentValue!! * 100
                     )
                 },
                 enabled = isInputValid && errorMessage == null

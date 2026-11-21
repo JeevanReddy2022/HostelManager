@@ -23,11 +23,8 @@ data class Stay(
     val roomId: String,
     val joinDate: String,
     val checkoutDate: String? = null,
-
-    // NEW: this resident's own agreed monthly rent, in paise
     @ColumnInfo(defaultValue = "0")
     val monthlyRent: Long = 0,
-
     val openingBalance: Long = 0,
     val depositCollected: Long = 0,
     val depositRefunded: Long = 0,
@@ -35,6 +32,10 @@ data class Stay(
     val depositRefundMode: String? = null,
     val isActive: Boolean = true,
     val returnOverlapDecision: String? = null,
+    // NEW: Day of month (1-31) that starts this resident's billing cycle.
+    // Set once when they join, carried forward across room transfers.
+    @ColumnInfo(defaultValue = "1")
+    val billingAnchorDay: Int = 1,
     val createdAt: Long = System.currentTimeMillis(),
     val updatedAt: Long = System.currentTimeMillis()
 )
