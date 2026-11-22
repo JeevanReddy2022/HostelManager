@@ -34,4 +34,31 @@ class ExpensesViewModel(application: Application) : AndroidViewModel(application
             expenseDao.deleteExpense(expenseId)
         }
     }
+
+    // NEW: Update expense (uses REPLACE conflict strategy to update by ID)
+    fun updateExpense(
+        id: String,
+        hostelId: String,
+        expenseDate: String,
+        enteredDate: String,
+        category: String,
+        amountPaise: Long,
+        note: String,
+        receiptImagePath: String?
+    ) {
+        viewModelScope.launch {
+            expenseDao.insertExpense(
+                Expense(
+                    id = id,
+                    hostelId = hostelId,
+                    expenseDate = expenseDate,
+                    enteredDate = enteredDate,
+                    category = category,
+                    amountPaise = amountPaise,
+                    note = note,
+                    receiptImagePath = receiptImagePath
+                )
+            )
+        }
+    }
 }

@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
@@ -15,6 +16,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.DropdownMenuItem
@@ -25,10 +27,13 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SelectableDates
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -38,17 +43,31 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusDirection
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.hostelmanager.ui.components.ImagePickerField
+import com.example.hostelmanager.ui.theme.AppBackground
+import com.example.hostelmanager.ui.theme.AppBorder
+import com.example.hostelmanager.ui.theme.AppMuted
+import com.example.hostelmanager.ui.theme.AppNavy
+import com.example.hostelmanager.ui.theme.AppRed
+import com.example.hostelmanager.ui.theme.AppText
 import kotlinx.coroutines.launch
 import java.time.Instant
 import java.time.LocalDate
-import java.time.ZoneId
+import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
+
+// Dark yellow for non-blocking warnings
+private val WarningYellow = Color(0xFFB8860B)
+
+// Amounts above this show a warning (does not block saving)
+private const val HIGH_AMOUNT_WARNING = 100_000L
 
 // Helper: validate date is correct format and not in future
 private fun isValidPastOrTodayDate(dateStr: String): Boolean {
@@ -83,18 +102,31 @@ fun AddExpenseScreen(
     var note by remember { mutableStateOf("") }
     var receiptImagePath by remember { mutableStateOf<String?>(null) }
 
-    val expenseDatePickerState = rememberDatePickerState()
+    // Date pickers: future dates are not selectable.
+    // DatePicker works in UTC-midnight millis, so compare against today's UTC midnight.
+    val todayUtcMillis = remember {
+        LocalDate.now().atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli()
+    }
+    val noFutureDates = remember {
+        object : SelectableDates {
+            override fun isSelectableDate(utcTimeMillis: Long): Boolean =
+                utcTimeMillis <= todayUtcMillis
+        }
+    }
+
+    val expenseDatePickerState = rememberDatePickerState(selectableDates = noFutureDates)
     var showExpenseDatePicker by remember { mutableStateOf(false) }
 
-    val enteredDatePickerState = rememberDatePickerState()
+    val enteredDatePickerState = rememberDatePickerState(selectableDates = noFutureDates)
     var showEnteredDatePicker by remember { mutableStateOf(false) }
 
     val scope = rememberCoroutineScope()
 
     val amountLong = amount.toLongOrNull() ?: 0L
     val isAmountValid = amountLong > 0
+    val showAmountWarning = isAmountValid && amountLong > HIGH_AMOUNT_WARNING
 
-    // NEW: Date validations
+    // Date validations
     val isExpenseDateValid = isValidPastOrTodayDate(expenseDate)
     val isExpenseDateFuture = expenseDate.isNotBlank() && try {
         LocalDate.parse(expenseDate, DateTimeFormatter.ISO_LOCAL_DATE).isAfter(LocalDate.now())
@@ -104,15 +136,39 @@ fun AddExpenseScreen(
     val isFormValid = isExpenseDateValid && isEnteredDateValid &&
             selectedCategory.isNotBlank() && isAmountValid
 
+    // High-contrast, warm-colored text field styling
+    val textFieldColors = OutlinedTextFieldDefaults.colors(
+        focusedTextColor = AppText,
+        unfocusedTextColor = AppText,
+        disabledTextColor = AppMuted,
+        focusedLabelColor = AppNavy,
+        unfocusedLabelColor = AppMuted,
+        disabledLabelColor = AppMuted,
+        focusedBorderColor = AppNavy,
+        unfocusedBorderColor = AppBorder,
+        disabledBorderColor = AppBorder,
+        errorBorderColor = AppRed,
+        errorLabelColor = AppRed,
+        errorTextColor = AppText,
+        errorSupportingTextColor = AppRed,
+        cursorColor = AppNavy
+    )
+
     Scaffold(
+        containerColor = AppBackground,
         topBar = {
             TopAppBar(
-                title = { Text("Add Expense") },
+                title = { Text("Add Expense", fontWeight = FontWeight.Bold, color = AppText) },
                 navigationIcon = {
                     IconButton(onClick = onBackClick) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+                        Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = AppText)
                     }
-                }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = AppBackground,
+                    titleContentColor = AppText,
+                    navigationIconContentColor = AppText
+                )
             )
         }
     ) { padding ->
@@ -120,32 +176,34 @@ fun AddExpenseScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .padding(16.dp)
+                .padding(horizontal = 20.dp, vertical = 16.dp)
                 .verticalScroll(rememberScrollState()),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            // Expense Date (when it actually occurred) — with validation
+            // Expense Date (when it actually occurred) — cannot be in the future
             OutlinedTextField(
                 value = expenseDate,
-                onValueChange = { expenseDate = it },
+                onValueChange = { expenseDate = it.trim().take(10) },
                 label = { Text("Expense Date (when occurred) *") },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text, imeAction = ImeAction.Next),
+                shape = RoundedCornerShape(12.dp),
+                colors = textFieldColors,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Next),
                 keyboardActions = KeyboardActions(onNext = { focusManager.moveFocus(FocusDirection.Down) }),
                 isError = expenseDate.isNotBlank() && !isExpenseDateValid,
                 supportingText = {
                     if (expenseDate.isNotBlank()) {
                         if (isExpenseDateFuture) {
-                            Text("Expense date cannot be in the future", color = MaterialTheme.colorScheme.error)
+                            Text("Expense date cannot be in the future", color = AppRed)
                         } else if (!isExpenseDateValid) {
-                            Text("Invalid date. Use YYYY-MM-DD format", color = MaterialTheme.colorScheme.error)
+                            Text("Invalid date. Use YYYY-MM-DD format", color = AppRed)
                         }
                     }
                 },
                 trailingIcon = {
                     IconButton(onClick = { showExpenseDatePicker = true }) {
-                        Icon(Icons.Default.CalendarToday, contentDescription = "Pick expense date")
+                        Icon(Icons.Default.CalendarToday, contentDescription = "Pick expense date", tint = AppNavy)
                     }
                 }
             )
@@ -153,21 +211,23 @@ fun AddExpenseScreen(
             // Entered Date (when recorded in app) — with validation
             OutlinedTextField(
                 value = enteredDate,
-                onValueChange = { enteredDate = it },
+                onValueChange = { enteredDate = it.trim().take(10) },
                 label = { Text("Recorded Date (when added) *") },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text, imeAction = ImeAction.Next),
+                shape = RoundedCornerShape(12.dp),
+                colors = textFieldColors,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Next),
                 keyboardActions = KeyboardActions(onNext = { focusManager.moveFocus(FocusDirection.Down) }),
                 isError = enteredDate.isNotBlank() && !isEnteredDateValid,
                 supportingText = {
                     if (enteredDate.isNotBlank() && !isEnteredDateValid) {
-                        Text("Invalid date. Use YYYY-MM-DD format", color = MaterialTheme.colorScheme.error)
+                        Text("Invalid date. Use YYYY-MM-DD format", color = AppRed)
                     }
                 },
                 trailingIcon = {
                     IconButton(onClick = { showEnteredDatePicker = true }) {
-                        Icon(Icons.Default.CalendarToday, contentDescription = "Pick recorded date")
+                        Icon(Icons.Default.CalendarToday, contentDescription = "Pick recorded date", tint = AppNavy)
                     }
                 }
             )
@@ -184,7 +244,9 @@ fun AddExpenseScreen(
                     label = { Text("Category *") },
                     trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expandedCategory) },
                     modifier = Modifier.fillMaxWidth().menuAnchor(),
-                    singleLine = true
+                    singleLine = true,
+                    shape = RoundedCornerShape(12.dp),
+                    colors = textFieldColors
                 )
                 ExposedDropdownMenu(
                     expanded = expandedCategory,
@@ -202,19 +264,27 @@ fun AddExpenseScreen(
                 }
             }
 
-            // Amount — with IME action
+            // Amount — digits only, max 9 digits, warning above ₹1,00,000
             OutlinedTextField(
                 value = amount,
-                onValueChange = { input -> amount = input.filter { it.isDigit() } },
+                onValueChange = { input -> amount = input.filter { it.isDigit() }.take(9) },
                 label = { Text("Amount (₹) *") },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
+                shape = RoundedCornerShape(12.dp),
+                colors = textFieldColors,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Next),
                 keyboardActions = KeyboardActions(onNext = { focusManager.moveFocus(FocusDirection.Down) }),
                 isError = amount.isNotBlank() && !isAmountValid,
                 supportingText = {
-                    if (amount.isNotBlank() && !isAmountValid) {
-                        Text("Amount must be greater than 0", color = MaterialTheme.colorScheme.error)
+                    when {
+                        amount.isNotBlank() && !isAmountValid ->
+                            Text("Amount must be greater than 0", color = AppRed)
+                        showAmountWarning ->
+                            Text(
+                                "Warning: Amount is above ₹1,00,000. Please double-check.",
+                                color = WarningYellow
+                            )
                     }
                 }
             )
@@ -226,6 +296,8 @@ fun AddExpenseScreen(
                 label = { Text("Note (optional)") },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
+                shape = RoundedCornerShape(12.dp),
+                colors = textFieldColors,
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
                 keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus() })
             )
@@ -258,10 +330,23 @@ fun AddExpenseScreen(
                         if (success) onBackClick()
                     }
                 },
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(52.dp),
+                shape = RoundedCornerShape(14.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = AppNavy,
+                    contentColor = Color.White,
+                    disabledContainerColor = AppBorder,
+                    disabledContentColor = AppMuted
+                ),
                 enabled = isFormValid
             ) {
-                Text("Save Expense")
+                Text(
+                    "Save Expense",
+                    fontWeight = FontWeight.Bold,
+                    style = MaterialTheme.typography.titleMedium
+                )
             }
         }
     }
@@ -274,15 +359,15 @@ fun AddExpenseScreen(
                 TextButton(onClick = {
                     expenseDatePickerState.selectedDateMillis?.let { millis ->
                         val pickedDate = Instant.ofEpochMilli(millis)
-                            .atZone(ZoneId.systemDefault())
+                            .atZone(ZoneOffset.UTC)
                             .toLocalDate()
                         expenseDate = pickedDate.format(DateTimeFormatter.ISO_LOCAL_DATE)
                     }
                     showExpenseDatePicker = false
-                }) { Text("OK") }
+                }) { Text("OK", color = AppNavy, fontWeight = FontWeight.Bold) }
             },
             dismissButton = {
-                TextButton(onClick = { showExpenseDatePicker = false }) { Text("Cancel") }
+                TextButton(onClick = { showExpenseDatePicker = false }) { Text("Cancel", color = AppMuted) }
             }
         ) {
             DatePicker(state = expenseDatePickerState)
@@ -297,15 +382,15 @@ fun AddExpenseScreen(
                 TextButton(onClick = {
                     enteredDatePickerState.selectedDateMillis?.let { millis ->
                         val pickedDate = Instant.ofEpochMilli(millis)
-                            .atZone(ZoneId.systemDefault())
+                            .atZone(ZoneOffset.UTC)
                             .toLocalDate()
                         enteredDate = pickedDate.format(DateTimeFormatter.ISO_LOCAL_DATE)
                     }
                     showEnteredDatePicker = false
-                }) { Text("OK") }
+                }) { Text("OK", color = AppNavy, fontWeight = FontWeight.Bold) }
             },
             dismissButton = {
-                TextButton(onClick = { showEnteredDatePicker = false }) { Text("Cancel") }
+                TextButton(onClick = { showEnteredDatePicker = false }) { Text("Cancel", color = AppMuted) }
             }
         ) {
             DatePicker(state = enteredDatePickerState)

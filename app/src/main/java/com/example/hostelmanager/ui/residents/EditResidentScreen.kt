@@ -156,15 +156,19 @@ fun EditResidentScreen(
         }
     }
 
-    val isPhoneValid = phone.matches(Regex("^\\d{10}$"))
-    val isEmergencyValid = emergency.matches(Regex("^\\d{10}$"))
+    val isPhoneValid = phone.matches(Regex("^[6-9]\\d{9}$"))
+    val isEmergencyValid = emergency.matches(Regex("^[6-9]\\d{9}$"))
+    val isNameValid = name.trim().length >= 4
+    val isGuardianValid = guardian.trim().length >= 4
     val isIdValid = when (selectedIdType) {
         "Aadhaar" -> govtId.matches(Regex("^[2-9][0-9]{11}$"))
         "Voter ID" -> govtId.matches(Regex("^[A-Z]{3}[0-9]{7}$"))
         "Driving License" -> govtId.matches(Regex("^(([A-Z]{2}[0-9]{2})( )?|([A-Z]{2}-[0-9]{2}))((19|20)[0-9]{2})[0-9]{7}$"))
         else -> false
     }
-
+    val isDobValid = dob.isNotBlank() && try {
+        LocalDate.parse(dob, DateTimeFormatter.ISO_LOCAL_DATE) <= LocalDate.now()
+    } catch (e: Exception) { false }
     val isFormValid = name.isNotBlank() && isPhoneValid && isIdValid && isEmergencyValid &&
             dob.isNotBlank() &&
             !govtFrontPath.isNullOrBlank() && !govtBackPath.isNullOrBlank()
@@ -209,12 +213,17 @@ fun EditResidentScreen(
                 SectionHeader("Personal Details")
 
                 OutlinedTextField(
-                    value = name, onValueChange = { name = it },
-                    label = { Text("Name *") },
+                    value = name,
+                    onValueChange = { input -> name = input.filter { it.isLetter() || it == ' ' || it == '.' }},
+                    label = { Text("Name * (min 4 characters)") },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
                     shape = RoundedCornerShape(12.dp),
                     colors = textFieldColors,
+                    isError = name.isNotBlank() && !isNameValid,
+                    supportingText = {
+                        if (name.isNotBlank() && !isNameValid) Text("Name must be at least 4 characters")
+                    },
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
                     keyboardActions = KeyboardActions(onNext = { focusManager.moveFocus(FocusDirection.Down) })
                 )
@@ -230,7 +239,7 @@ fun EditResidentScreen(
                     keyboardActions = KeyboardActions(onNext = { focusManager.moveFocus(FocusDirection.Down) }),
                     isError = (phone.isNotBlank() && !isPhoneValid) || phoneError != null,
                     supportingText = {
-                        if (phone.isNotBlank() && !isPhoneValid) Text("Must be exactly 10 digits")
+                        if (phone.isNotBlank() && !isPhoneValid) Text("Must be exactly 10 digits, starting with 6-9")
                         else if (phoneError != null) Text(phoneError!!)
                     }
                 )
@@ -285,7 +294,7 @@ fun EditResidentScreen(
                     keyboardActions = KeyboardActions(onNext = { focusManager.moveFocus(FocusDirection.Down) }),
                     isError = (emergency.isNotBlank() && !isEmergencyValid) || emergencyError != null,
                     supportingText = {
-                        if (emergency.isNotBlank() && !isEmergencyValid) Text("Must be exactly 10 digits")
+                        if (emergency.isNotBlank() && !isEmergencyValid) Text("Must be exactly 10 digits, starting with 6-9")
                         else if (emergencyError != null) Text(emergencyError!!)
                     }
                 )
@@ -297,8 +306,12 @@ fun EditResidentScreen(
                     singleLine = true,
                     shape = RoundedCornerShape(12.dp),
                     colors = textFieldColors,
-                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Next, ),
                     keyboardActions = KeyboardActions(onNext = { focusManager.moveFocus(FocusDirection.Down) }),
+                    isError = dob.isNotBlank() && !isDobValid,
+                    supportingText = {
+                        if (dob.isNotBlank() && !isDobValid) Text("Invalid date or date is in the future")
+                    },
                     trailingIcon = {
                         IconButton(onClick = { showDobDatePicker = true }) {
                             Icon(Icons.Default.CalendarToday, contentDescription = "Pick DOB", tint = AppNavy)
@@ -335,14 +348,19 @@ fun EditResidentScreen(
                 }
 
                 OutlinedTextField(
-                    value = guardian, onValueChange = { guardian = it },
+                    value = guardian,
+                    onValueChange = { input -> guardian = input.filter { it.isLetter() || it == ' ' || it == '.' }},
                     label = { Text("Guardian Name") },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
                     shape = RoundedCornerShape(12.dp),
                     colors = textFieldColors,
-                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
-                    keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus() })
+                    isError = guardian.isNotBlank() && !isGuardianValid,
+                    supportingText = {
+                        if (guardian.isNotBlank() && !isGuardianValid) Text("Name must be at least 4 characters")
+                    },
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
+                    keyboardActions = KeyboardActions(onNext = { focusManager.moveFocus(FocusDirection.Down) })
                 )
 
                 Spacer(modifier = Modifier.height(8.dp))

@@ -130,7 +130,7 @@ fun AddRoomDialog(
 
                 OutlinedTextField(
                     value = rent,
-                    onValueChange = { rent = it },
+                    onValueChange = { input -> rent = input.filter { it.isDigit() }.take(5) },
                     label = { Text("Rent per Bed (₹)") },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true,

@@ -2,7 +2,17 @@ package com.example.hostelmanager.ui.residents
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
@@ -11,10 +21,38 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.CalendarToday
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.DatePicker
+import androidx.compose.material3.DatePickerDialog
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.rememberDatePickerState
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalFocusManager
@@ -24,11 +62,19 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.hostelmanager.data.RoomWithOccupancy
-import com.example.hostelmanager.ui.theme.*
+import com.example.hostelmanager.ui.rooms.RoomPickerDialog
+import com.example.hostelmanager.ui.theme.AppBackground
+import com.example.hostelmanager.ui.theme.AppBorder
+import com.example.hostelmanager.ui.theme.AppCard
+import com.example.hostelmanager.ui.theme.AppMuted
+import com.example.hostelmanager.ui.theme.AppNavy
+import com.example.hostelmanager.ui.theme.AppRed
+import com.example.hostelmanager.ui.theme.AppText
 import kotlinx.coroutines.launch
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneOffset
+import java.time.format.DateTimeFormatter
 
 private const val PAISE = 100L
 private val FieldShape = RoundedCornerShape(12.dp)
@@ -36,7 +82,6 @@ private val FieldShape = RoundedCornerShape(12.dp)
 private val RoomWithOccupancy.vacancy get() = room.bedCount - occupiedBeds
 private fun String.toPaise() = (toLongOrNull() ?: 0L) * PAISE
 
-// Length check first: avoids throwing a parse exception on every partial keystroke.
 private fun parseDate(s: String): LocalDate? =
     if (s.length != 10) null else runCatching { LocalDate.parse(s) }.getOrNull()
 
@@ -61,12 +106,13 @@ fun ReAdmitResidentScreen(
     val today = remember { LocalDate.now().toString() }
 
     var selectedRoom by remember { mutableStateOf<RoomWithOccupancy?>(null) }
-    var expandedRoom by remember { mutableStateOf(false) }
     var joinDate by remember { mutableStateOf(today) }
     var rent by remember { mutableStateOf("") }
     var deposit by remember { mutableStateOf("") }
     var showDatePicker by remember { mutableStateOf(false) }
+    var showRoomPicker by remember { mutableStateOf(false) } // NEW
     var showConfirmDialog by remember { mutableStateOf(false) }
+    val focusManager = LocalFocusManager.current
 
     val dateError by remember {
         derivedStateOf {
@@ -80,6 +126,23 @@ fun ReAdmitResidentScreen(
                     rent.isNotBlank() && deposit.isNotBlank()
         }
     }
+
+    val textFieldColors = OutlinedTextFieldDefaults.colors(
+        focusedTextColor = AppText,
+        unfocusedTextColor = AppText,
+        disabledTextColor = AppMuted,
+        errorTextColor = AppText,
+        focusedLabelColor = AppNavy,
+        unfocusedLabelColor = AppMuted,
+        disabledLabelColor = AppMuted,
+        errorLabelColor = AppRed,
+        focusedBorderColor = AppNavy,
+        unfocusedBorderColor = AppBorder,
+        disabledBorderColor = AppBorder,
+        errorBorderColor = AppRed,
+        errorSupportingTextColor = AppRed,
+        cursorColor = AppNavy
+    )
 
     Scaffold(
         containerColor = AppBackground,
@@ -118,66 +181,82 @@ fun ReAdmitResidentScreen(
 
             SectionHeader("New Stay Details")
 
-            ExposedDropdownMenuBox(
-                expanded = expandedRoom,
-                onExpandedChange = { expandedRoom = !expandedRoom }
-            ) {
-                AppTextField(
-                    value = selectedRoom?.room?.roomNumber ?: "",
+            // ✅ FIXED: Use Box + pointerInput for reliable mobile taps
+            val currentRoom = selectedRoom
+            Box(modifier = Modifier.fillMaxWidth()) {
+                OutlinedTextField(
+                    value = currentRoom?.room?.roomNumber ?: "",
                     onValueChange = {},
-                    label = "Select Room *",
                     readOnly = true,
-                    modifier = Modifier.menuAnchor(),
-                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expandedRoom) }
-                )
-                ExposedDropdownMenu(
-                    expanded = expandedRoom,
-                    onDismissRequest = { expandedRoom = false }
-                ) {
-                    if (availableRooms.isEmpty()) {
-                        DropdownMenuItem(
-                            text = { Text("No rooms with vacancy") },
-                            onClick = { expandedRoom = false }
-                        )
-                    } else {
-                        availableRooms.forEach { room ->
-                            DropdownMenuItem(
-                                text = { Text("Room ${room.room.roomNumber} (Vacancy: ${room.vacancy})") },
-                                onClick = {
-                                    selectedRoom = room
-                                    expandedRoom = false
-                                    // Auto-fill rent on selection (no LaunchedEffect needed)
-                                    if (rent.isEmpty()) rent = (room.room.defaultRentPerBed / PAISE).toString()
-                                }
+                    singleLine = true,
+                    label = { Text("Select Room *") },
+                    placeholder = { Text("Tap to search rooms", color = AppMuted) },
+                    trailingIcon = {
+                        Icon(Icons.Default.Search, contentDescription = "Search rooms", tint = AppNavy)
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = FieldShape,
+                    colors = textFieldColors,
+                    supportingText = {
+                        if (currentRoom != null) {
+                            Text(
+                                "Beds: ${currentRoom.room.bedCount} · Vacancy: ${currentRoom.vacancy}",
+                                color = AppMuted
                             )
                         }
                     }
-                }
+                )
+
+                // Overlay: topmost child, catches the tap
+                Box(
+                    modifier = Modifier
+                        .matchParentSize()
+                        .clickable { showRoomPicker = true }
+                )
             }
 
-            AppTextField(
+            OutlinedTextField(
                 value = joinDate,
                 onValueChange = { joinDate = it.trim().take(10) },
-                label = "New Join Date (YYYY-MM-DD) *",
-                error = dateError,
+                label = { Text("New Join Date (YYYY-MM-DD) *") },
+                modifier = Modifier.fillMaxWidth(),
+                shape = FieldShape,
+                colors = textFieldColors,
+                isError = dateError != null,
+                supportingText = dateError?.let { { Text(it) } },
                 trailingIcon = {
                     IconButton(onClick = { showDatePicker = true }) {
                         Icon(Icons.Default.CalendarToday, "Pick date", tint = AppNavy)
                     }
-                }
+                },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Next),
+                keyboardActions = KeyboardActions(
+                    onNext = { focusManager.moveFocus(FocusDirection.Down) }
+                ),
             )
 
-            AppTextField(
+            OutlinedTextField(
                 value = rent,
                 onValueChange = { rent = it.filter(Char::isDigit).take(5) },
-                label = "New Monthly Rent (₹) *"
+                label = { Text("New Monthly Rent (₹) *") },
+                modifier = Modifier.fillMaxWidth(),
+                shape = FieldShape,
+                colors = textFieldColors,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Next),
+                keyboardActions = KeyboardActions(
+                    onNext = { focusManager.moveFocus(FocusDirection.Down) }
+                ),
             )
 
-            AppTextField(
+            OutlinedTextField(
                 value = deposit,
                 onValueChange = { deposit = it.filter(Char::isDigit).take(5) },
-                label = "New Deposit Collected (₹) *",
-                onDone = { if (isFormValid) showConfirmDialog = true }
+                label = { Text("New Deposit Collected (₹) *") },
+                modifier = Modifier.fillMaxWidth(),
+                shape = FieldShape,
+                colors = textFieldColors,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number,imeAction = ImeAction.Done),
+                //keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus() })
             )
 
             Text(
@@ -192,6 +271,18 @@ fun ReAdmitResidentScreen(
                 onClick = { showConfirmDialog = true }
             )
         }
+    }
+
+    // ✅ Room Picker Dialog
+    if (showRoomPicker) {
+        RoomPickerDialog(
+            rooms = availableRooms,
+            onDismiss = { showRoomPicker = false },
+            onSelect = { room ->
+                selectedRoom = room
+                if (rent.isEmpty()) rent = (room.room.defaultRentPerBed / PAISE).toString()
+            }
+        )
     }
 
     if (showDatePicker) {
@@ -226,63 +317,6 @@ fun ReAdmitResidentScreen(
 }
 
 // ---------- Reusable pieces ----------
-
-@Composable
-private fun appFieldColors() = OutlinedTextFieldDefaults.colors(
-    focusedTextColor = AppText,
-    unfocusedTextColor = AppText,
-    disabledTextColor = AppMuted,
-    errorTextColor = AppText,
-    focusedLabelColor = AppNavy,
-    unfocusedLabelColor = AppMuted,
-    disabledLabelColor = AppMuted,
-    errorLabelColor = AppRed,
-    focusedBorderColor = AppNavy,
-    unfocusedBorderColor = AppBorder,
-    disabledBorderColor = AppBorder,
-    errorBorderColor = AppRed,
-    errorSupportingTextColor = AppRed,
-    cursorColor = AppNavy
-)
-
-@Composable
-private fun AppTextField(
-    value: String,
-    onValueChange: (String) -> Unit,
-    label: String,
-    modifier: Modifier = Modifier,
-    readOnly: Boolean = false,
-    error: String? = null,
-    keyboardType: KeyboardType = KeyboardType.Number,
-    onDone: (() -> Unit)? = null,
-    trailingIcon: @Composable (() -> Unit)? = null
-) {
-    val focusManager = LocalFocusManager.current
-    OutlinedTextField(
-        value = value,
-        onValueChange = onValueChange,
-        readOnly = readOnly,
-        singleLine = true,
-        label = { Text(label) },
-        modifier = Modifier.fillMaxWidth().then(modifier),
-        shape = FieldShape,
-        colors = appFieldColors(),
-        isError = error != null,
-        supportingText = error?.let { { Text(it) } },
-        trailingIcon = trailingIcon,
-        keyboardOptions = KeyboardOptions(
-            keyboardType = keyboardType,
-            imeAction = if (onDone != null) ImeAction.Done else ImeAction.Next
-        ),
-        keyboardActions = KeyboardActions(
-            onNext = { focusManager.moveFocus(FocusDirection.Down) },
-            onDone = {
-                focusManager.clearFocus()
-                onDone?.invoke()
-            }
-        )
-    )
-}
 
 @Composable
 private fun SubmitButton(text: String, enabled: Boolean, onClick: () -> Unit) {
@@ -332,7 +366,6 @@ private fun ResidentDetailsCard(phone: String?, govtId: String?) {
     }
 }
 
-// DatePickerState is only created while the dialog is visible.
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun JoinDatePickerDialog(

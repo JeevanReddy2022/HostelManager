@@ -1,7 +1,9 @@
 package com.example.hostelmanager.ui.residents
 
+import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.net.Uri
+import android.widget.Toast
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -25,7 +27,10 @@ import androidx.compose.material.icons.filled.Call
 import androidx.compose.material.icons.filled.Message
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PersonAdd
+import androidx.compose.material.icons.filled.Sms
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.FloatingActionButton
@@ -45,17 +50,19 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
+import com.example.hostelmanager.R
 import com.example.hostelmanager.data.ResidentWithRoom
 import com.example.hostelmanager.ui.theme.AppBackground
 import com.example.hostelmanager.ui.theme.AppBorder
 import com.example.hostelmanager.ui.theme.AppCard
-import com.example.hostelmanager.ui.theme.AppGreen
 import com.example.hostelmanager.ui.theme.AppMuted
 import com.example.hostelmanager.ui.theme.AppNavy
 import com.example.hostelmanager.ui.theme.AppSoftBlue
@@ -66,19 +73,20 @@ import java.time.LocalDate
 import java.time.format.TextStyle
 import java.util.Locale
 
+private val WhatsAppGreen = Color(0xFF25D366)
+
 @Composable
 fun ResidentListScreen(
     hostelId: String,
     onAddClick: () -> Unit,
     onResidentClick: (String) -> Unit,
     modifier: Modifier = Modifier,
-    viewModel: ResidentListViewModel = viewModel() // ✅ Reverted to your original ViewModel
+    viewModel: ResidentListViewModel = viewModel()
 ) {
     LaunchedEffect(hostelId) {
         viewModel.setHostelId(hostelId)
     }
 
-    // ✅ This now correctly resolves to List<ResidentWithRoom>
     val residents by viewModel.residents.collectAsState()
 
     Box(
@@ -130,7 +138,7 @@ fun ResidentListScreen(
                     .padding(bottom = 88.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                items(residents) { residentWithRoom -> // ✅ Now correctly iterates over ResidentWithRoom
+                items(residents) { residentWithRoom ->
                     ResidentCard(
                         residentWithRoom = residentWithRoom,
                         onClick = { onResidentClick(residentWithRoom.person.id) }
@@ -143,7 +151,7 @@ fun ResidentListScreen(
             onClick = onAddClick,
             shape = RoundedCornerShape(18.dp),
             containerColor = AppNavy,
-            contentColor = androidx.compose.ui.graphics.Color.White,
+            contentColor = Color.White,
             elevation = FloatingActionButtonDefaults.elevation(6.dp),
             modifier = Modifier
                 .align(Alignment.BottomEnd)
@@ -191,7 +199,6 @@ fun ResidentCard(residentWithRoom: ResidentWithRoom, onClick: () -> Unit) {
 
                 Spacer(modifier = Modifier.height(6.dp))
 
-                // Premium Pills for Room and Rent
                 Row {
                     Box(
                         modifier = Modifier
@@ -228,7 +235,11 @@ fun ResidentCard(residentWithRoom: ResidentWithRoom, onClick: () -> Unit) {
                 IconButton(
                     onClick = {
                         val intent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:${person.phone}"))
-                        context.startActivity(intent)
+                        try {
+                            context.startActivity(intent)
+                        } catch (e: ActivityNotFoundException) {
+                            Toast.makeText(context, "No dialer app found", Toast.LENGTH_SHORT).show()
+                        }
                     }
                 ) {
                     Icon(
@@ -251,7 +262,7 @@ fun ResidentCard(residentWithRoom: ResidentWithRoom, onClick: () -> Unit) {
         }
     }
 
-    // WhatsApp/SMS Choice Dialog (Fully retained)
+    // WhatsApp/SMS Choice Dialog
     if (showMessageDialog) {
         val rentAmount = residentWithRoom.monthlyRent / 100
 
@@ -267,7 +278,11 @@ fun ResidentCard(residentWithRoom: ResidentWithRoom, onClick: () -> Unit) {
                 val encodedMessage = URLEncoder.encode(message, "UTF-8")
                 val whatsappUri = Uri.parse("https://wa.me/$whatsappNumber?text=$encodedMessage")
                 val intent = Intent(Intent.ACTION_VIEW, whatsappUri)
-                context.startActivity(intent)
+                try {
+                    context.startActivity(intent)
+                } catch (e: ActivityNotFoundException) {
+                    Toast.makeText(context, "WhatsApp not installed", Toast.LENGTH_SHORT).show()
+                }
                 showMessageDialog = false
             },
             onSmsClick = {
@@ -275,7 +290,11 @@ fun ResidentCard(residentWithRoom: ResidentWithRoom, onClick: () -> Unit) {
                 val message = "Hi ${person.name},\nPlease pay the rent ₹$rentAmount for $monthName.\nThanks!"
                 val intent = Intent(Intent.ACTION_SENDTO, Uri.parse("smsto:${person.phone}"))
                 intent.putExtra("sms_body", message)
-                context.startActivity(intent)
+                try {
+                    context.startActivity(intent)
+                } catch (e: ActivityNotFoundException) {
+                    Toast.makeText(context, "No SMS app found", Toast.LENGTH_SHORT).show()
+                }
                 showMessageDialog = false
             }
         )
@@ -318,6 +337,9 @@ fun MessageChoiceDialog(
     onWhatsAppClick: () -> Unit,
     onSmsClick: () -> Unit
 ) {
+    // Same style for the title and both buttons so they match in size
+    val bigStyle = MaterialTheme.typography.titleLarge
+
     AlertDialog(
         onDismissRequest = onDismiss,
         shape = RoundedCornerShape(24.dp),
@@ -325,23 +347,57 @@ fun MessageChoiceDialog(
         titleContentColor = AppText,
         textContentColor = AppMuted,
         title = {
-            Text("Send Message", fontWeight = FontWeight.Bold)
+            Text("Send Message", style = bigStyle, fontWeight = FontWeight.Bold)
         },
         text = {
             Column {
                 Text("Choose how to send the rent reminder to $personName:")
-                Spacer(modifier = Modifier.height(16.dp))
-                TextButton(
+                Spacer(modifier = Modifier.height(20.dp))
+
+                // WhatsApp button
+                Button(
                     onClick = onWhatsAppClick,
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(56.dp),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = WhatsAppGreen,
+                        contentColor = Color.White
+                    )
                 ) {
-                    Text("💬 WhatsApp", color = AppGreen, fontWeight = FontWeight.Bold)
+                    Icon(
+                        painter = painterResource(id = R.drawable.ic_whatsapp),
+                        contentDescription = "WhatsApp",
+                        tint = Color.White,
+                        modifier = Modifier.size(26.dp)
+                    )
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Text("WhatsApp", style = bigStyle, fontWeight = FontWeight.Bold)
                 }
-                TextButton(
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // SMS button
+                Button(
                     onClick = onSmsClick,
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(56.dp),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = AppNavy,
+                        contentColor = Color.White
+                    )
                 ) {
-                    Text("📱 SMS", color = AppNavy, fontWeight = FontWeight.Bold)
+                    Icon(
+                        imageVector = Icons.Default.Sms,
+                        contentDescription = "SMS",
+                        tint = Color.White,
+                        modifier = Modifier.size(26.dp)
+                    )
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Text("SMS", style = bigStyle, fontWeight = FontWeight.Bold)
                 }
             }
         },

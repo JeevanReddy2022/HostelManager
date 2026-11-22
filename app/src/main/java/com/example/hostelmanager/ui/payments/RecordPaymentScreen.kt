@@ -1,5 +1,6 @@
 package com.example.hostelmanager.ui.payments
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -10,6 +11,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
@@ -18,7 +20,9 @@ import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.DropdownMenuItem
@@ -29,10 +33,12 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -42,14 +48,25 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusDirection
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.hostelmanager.data.ResidentWithRoom
+import com.example.hostelmanager.ui.theme.AppBackground
+import com.example.hostelmanager.ui.theme.AppBorder
+import com.example.hostelmanager.ui.theme.AppCard
+import com.example.hostelmanager.ui.theme.AppMuted
+import com.example.hostelmanager.ui.theme.AppNavy
+import com.example.hostelmanager.ui.theme.AppRed
+import com.example.hostelmanager.ui.theme.AppSoftBlue
+import com.example.hostelmanager.ui.theme.AppText
 import kotlinx.coroutines.launch
 import java.time.Instant
 import java.time.LocalDate
@@ -106,6 +123,24 @@ fun RecordPaymentScreen(
 
     val scope = rememberCoroutineScope()
 
+    // High-contrast, warm-colored text field styling
+    val textFieldColors = OutlinedTextFieldDefaults.colors(
+        focusedTextColor = AppText,
+        unfocusedTextColor = AppText,
+        disabledTextColor = AppMuted,
+        focusedLabelColor = AppNavy,
+        unfocusedLabelColor = AppMuted,
+        disabledLabelColor = AppMuted,
+        focusedBorderColor = AppNavy,
+        unfocusedBorderColor = AppBorder,
+        disabledBorderColor = AppBorder,
+        errorBorderColor = AppRed,
+        errorLabelColor = AppRed,
+        errorTextColor = AppText,
+        errorSupportingTextColor = AppRed,
+        cursorColor = AppNavy
+    )
+
     LaunchedEffect(prefilledPersonId, allResidents) {
         if (prefilledPersonId.isNotEmpty() && prefilledPersonId != "none" && selectedResident == null) {
             selectedResident = allResidents.find { it.person.id == prefilledPersonId }
@@ -137,7 +172,7 @@ fun RecordPaymentScreen(
     val isAmountZeroOrNegative = amount.isNotBlank() && amountLong <= 0
     val isAmountExceeding = amount.isNotBlank() && amountLong > maxAllowed
 
-    // NEW: Date validations
+    // Date validations
     val isPaymentDateValid = isValidPastOrTodayDate(paymentDate)
     val isPaymentDateFuture = paymentDate.isNotBlank() && try {
         LocalDate.parse(paymentDate, DateTimeFormatter.ISO_LOCAL_DATE).isAfter(LocalDate.now())
@@ -148,14 +183,20 @@ fun RecordPaymentScreen(
             isPaymentDateValid && isRecordedDateValid
 
     Scaffold(
+        containerColor = AppBackground,
         topBar = {
             TopAppBar(
-                title = { Text("Record Payment") },
+                title = { Text("Record Payment", fontWeight = FontWeight.Bold, color = AppText) },
                 navigationIcon = {
                     IconButton(onClick = onBackClick) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+                        Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = AppText)
                     }
-                }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = AppBackground,
+                    titleContentColor = AppText,
+                    navigationIconContentColor = AppText
+                )
             )
         }
     ) { padding ->
@@ -163,9 +204,9 @@ fun RecordPaymentScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .padding(16.dp)
+                .padding(horizontal = 20.dp, vertical = 16.dp)
                 .verticalScroll(rememberScrollState()),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             // Resident picker
             if (selectedResident == null) {
@@ -175,12 +216,20 @@ fun RecordPaymentScreen(
                     label = { Text("Search resident (name, phone, or room)") },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
+                    shape = RoundedCornerShape(12.dp),
+                    colors = textFieldColors,
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
                     keyboardActions = KeyboardActions(onSearch = { focusManager.clearFocus() })
                 )
 
                 if (filteredResidents.isNotEmpty()) {
-                    Card(modifier = Modifier.fillMaxWidth()) {
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(20.dp),
+                        colors = CardDefaults.cardColors(containerColor = AppCard),
+                        border = BorderStroke(1.dp, AppBorder),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                    ) {
                         Column {
                             filteredResidents.forEach { resident ->
                                 ResidentSearchResult(
@@ -201,24 +250,44 @@ fun RecordPaymentScreen(
                         .clickable {
                             selectedResident = null
                             amount = ""
-                        }
+                        },
+                    shape = RoundedCornerShape(20.dp),
+                    colors = CardDefaults.cardColors(containerColor = AppSoftBlue),
+                    border = BorderStroke(1.dp, AppBorder)
                 ) {
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(16.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
                         Column(modifier = Modifier.weight(1f)) {
-                            Text(selectedResident!!.person.name, style = MaterialTheme.typography.titleMedium)
-                            Text("Room ${selectedResident!!.roomNumber}", style = MaterialTheme.typography.bodySmall)
-                            Text("Rent: ₹${selectedResident!!.monthlyRent / 100}", style = MaterialTheme.typography.bodyMedium)
+                            Text(
+                                selectedResident!!.person.name,
+                                style = MaterialTheme.typography.titleLarge,
+                                fontWeight = FontWeight.Bold,
+                                color = AppNavy
+                            )
+                            Text(
+                                "Room ${selectedResident!!.roomNumber}",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = AppMuted
+                            )
                         }
-                        IconButton(onClick = {
-                            selectedResident = null
-                            amount = ""
-                        }) {
-                            Icon(Icons.Default.Close, contentDescription = "Clear")
+                        Column(horizontalAlignment = Alignment.End) {
+                            Text(
+                                "Rent: ₹${selectedResident!!.monthlyRent / 100}",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = AppNavy
+                            )
+                            IconButton(onClick = {
+                                selectedResident = null
+                                amount = ""
+                            }) {
+                                Icon(Icons.Default.Close, contentDescription = "Clear", tint = AppNavy)
+                            }
                         }
                     }
                 }
@@ -230,20 +299,22 @@ fun RecordPaymentScreen(
                 label = { Text("Amount (₹) *") },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
+                shape = RoundedCornerShape(12.dp),
+                colors = textFieldColors,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Next),
                 keyboardActions = KeyboardActions(onNext = { focusManager.moveFocus(FocusDirection.Down) }),
                 isError = amount.isNotBlank() && !isAmountValid,
                 supportingText = {
                     if (selectedResident != null) {
                         if (isAmountZeroOrNegative) {
-                            Text("Amount must be greater than 0", color = MaterialTheme.colorScheme.error)
+                            Text("Amount must be greater than 0", color = AppRed)
                         } else if (isAmountExceeding) {
                             Text(
                                 "Cannot exceed ₹$maxAllowed (rent ₹$rentRupees + ₹$PENDING_BUFFER_RUPEES buffer)",
-                                color = MaterialTheme.colorScheme.error
+                                color = AppRed
                             )
                         } else {
-                            Text("Rent: ₹$rentRupees · Max allowed: ₹$maxAllowed (includes ₹$PENDING_BUFFER_RUPEES buffer)")
+                            Text("Rent: ₹$rentRupees · Max allowed: ₹$maxAllowed", color = AppMuted)
                         }
                     }
                 }
@@ -256,21 +327,23 @@ fun RecordPaymentScreen(
                 label = { Text("Payment Date (when received) *") },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text, imeAction = ImeAction.Next),
+                shape = RoundedCornerShape(12.dp),
+                colors = textFieldColors,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Next),
                 keyboardActions = KeyboardActions(onNext = { focusManager.moveFocus(FocusDirection.Down) }),
                 isError = paymentDate.isNotBlank() && !isPaymentDateValid,
                 supportingText = {
                     if (paymentDate.isNotBlank()) {
                         if (isPaymentDateFuture) {
-                            Text("Payment date cannot be in the future", color = MaterialTheme.colorScheme.error)
+                            Text("Payment date cannot be in the future", color = AppRed)
                         } else if (!isPaymentDateValid) {
-                            Text("Invalid date. Use YYYY-MM-DD format", color = MaterialTheme.colorScheme.error)
+                            Text("Invalid date. Use YYYY-MM-DD format", color = AppRed)
                         }
                     }
                 },
                 trailingIcon = {
                     IconButton(onClick = { showPaymentDatePicker = true }) {
-                        Icon(Icons.Default.CalendarToday, contentDescription = "Pick payment date")
+                        Icon(Icons.Default.CalendarToday, contentDescription = "Pick payment date", tint = AppNavy)
                     }
                 }
             )
@@ -282,17 +355,19 @@ fun RecordPaymentScreen(
                 label = { Text("Recorded Date (when added) *") },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text, imeAction = ImeAction.Next),
+                shape = RoundedCornerShape(12.dp),
+                colors = textFieldColors,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Next),
                 keyboardActions = KeyboardActions(onNext = { focusManager.moveFocus(FocusDirection.Down) }),
                 isError = recordedDate.isNotBlank() && !isRecordedDateValid,
                 supportingText = {
                     if (recordedDate.isNotBlank() && !isRecordedDateValid) {
-                        Text("Invalid date. Use YYYY-MM-DD format", color = MaterialTheme.colorScheme.error)
+                        Text("Invalid date. Use YYYY-MM-DD format", color = AppRed)
                     }
                 },
                 trailingIcon = {
                     IconButton(onClick = { showRecordedDatePicker = true }) {
-                        Icon(Icons.Default.CalendarToday, contentDescription = "Pick recorded date")
+                        Icon(Icons.Default.CalendarToday, contentDescription = "Pick recorded date", tint = AppNavy)
                     }
                 }
             )
@@ -308,7 +383,9 @@ fun RecordPaymentScreen(
                     label = { Text("Payment Mode *") },
                     trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expandedMode) },
                     modifier = Modifier.fillMaxWidth().menuAnchor(),
-                    singleLine = true
+                    singleLine = true,
+                    shape = RoundedCornerShape(12.dp),
+                    colors = textFieldColors
                 )
                 ExposedDropdownMenu(
                     expanded = expandedMode,
@@ -332,11 +409,13 @@ fun RecordPaymentScreen(
                 label = { Text("Note (optional)") },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
+                shape = RoundedCornerShape(12.dp),
+                colors = textFieldColors,
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
                 keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus() })
             )
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(8.dp))
 
             Button(
                 onClick = {
@@ -353,10 +432,23 @@ fun RecordPaymentScreen(
                         if (success) onBackClick()
                     }
                 },
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(52.dp),
+                shape = RoundedCornerShape(14.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = AppNavy,
+                    contentColor = Color.White,
+                    disabledContainerColor = AppBorder,
+                    disabledContentColor = AppMuted
+                ),
                 enabled = isFormValid
             ) {
-                Text("Save Payment")
+                Text(
+                    "Save Payment",
+                    fontWeight = FontWeight.Bold,
+                    style = MaterialTheme.typography.titleMedium
+                )
             }
         }
     }
@@ -374,10 +466,10 @@ fun RecordPaymentScreen(
                         paymentDate = pickedDate.format(DateTimeFormatter.ISO_LOCAL_DATE)
                     }
                     showPaymentDatePicker = false
-                }) { Text("OK") }
+                }) { Text("OK", color = AppNavy, fontWeight = FontWeight.Bold) }
             },
             dismissButton = {
-                TextButton(onClick = { showPaymentDatePicker = false }) { Text("Cancel") }
+                TextButton(onClick = { showPaymentDatePicker = false }) { Text("Cancel", color = AppMuted) }
             }
         ) {
             DatePicker(state = paymentDatePickerState)
@@ -397,10 +489,10 @@ fun RecordPaymentScreen(
                         recordedDate = pickedDate.format(DateTimeFormatter.ISO_LOCAL_DATE)
                     }
                     showRecordedDatePicker = false
-                }) { Text("OK") }
+                }) { Text("OK", color = AppNavy, fontWeight = FontWeight.Bold) }
             },
             dismissButton = {
-                TextButton(onClick = { showRecordedDatePicker = false }) { Text("Cancel") }
+                TextButton(onClick = { showRecordedDatePicker = false }) { Text("Cancel", color = AppMuted) }
             }
         ) {
             DatePicker(state = recordedDatePickerState)
@@ -415,15 +507,35 @@ fun ResidentSearchResult(resident: ResidentWithRoom, onClick: () -> Unit) {
             .fillMaxWidth()
             .clickable { onClick() }
             .padding(16.dp),
-        horizontalArrangement = Arrangement.SpaceBetween
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
     ) {
         Column(modifier = Modifier.weight(1f)) {
-            Text(resident.person.name, style = MaterialTheme.typography.bodyLarge)
-            Text(resident.person.phone, style = MaterialTheme.typography.bodySmall)
+            Text(
+                resident.person.name,
+                style = MaterialTheme.typography.bodyLarge,
+                color = AppText,
+                fontWeight = FontWeight.Medium
+            )
+            Text(
+                resident.person.phone,
+                style = MaterialTheme.typography.bodySmall,
+                color = AppMuted
+            )
         }
-        Column {
-            Text("Room ${resident.roomNumber}", style = MaterialTheme.typography.bodySmall)
-            Text("₹${resident.monthlyRent / 100}", style = MaterialTheme.typography.bodyMedium)
+        Column(horizontalAlignment = Alignment.End) {
+            Text(
+                "Room ${resident.roomNumber}",
+                style = MaterialTheme.typography.bodySmall,
+                color = AppNavy,
+                fontWeight = FontWeight.Medium
+            )
+            Text(
+                "₹${resident.monthlyRent / 100}",
+                style = MaterialTheme.typography.bodyMedium,
+                color = AppText,
+                fontWeight = FontWeight.Bold
+            )
         }
     }
 }

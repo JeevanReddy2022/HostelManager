@@ -1,7 +1,9 @@
 package com.example.hostelmanager.ui.rooms
 
+import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.net.Uri
+import android.widget.Toast
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -13,6 +15,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -27,10 +30,15 @@ import androidx.compose.material.icons.filled.Call
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Message
+import androidx.compose.material.icons.filled.PersonAdd
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.FloatingActionButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -49,11 +57,14 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.hostelmanager.data.ResidentWithRoom
+import com.example.hostelmanager.ui.residents.MessageChoiceDialog
 import com.example.hostelmanager.ui.residents.ResidentAvatar
 import com.example.hostelmanager.ui.theme.AppBackground
 import com.example.hostelmanager.ui.theme.AppBorder
@@ -75,8 +86,10 @@ import java.util.Locale
 @Composable
 fun RoomDetailsScreen(
     roomId: String,
+    hostelId: String, // Passed to navigation for Add Resident
     onBackClick: () -> Unit,
     onResidentClick: (String) -> Unit,
+    onAddResidentClick: () -> Unit, // Callback to navigate to Add Resident
     viewModel: RoomDetailsViewModel = viewModel()
 ) {
     LaunchedEffect(roomId) {
@@ -106,7 +119,8 @@ fun RoomDetailsScreen(
                     Text(
                         room?.roomNumber ?: "Room Details",
                         fontWeight = FontWeight.Bold,
-                        color = AppText
+                        color = AppText,
+                        maxLines = 1
                     )
                 },
                 navigationIcon = {
@@ -120,6 +134,17 @@ fun RoomDetailsScreen(
                     navigationIconContentColor = AppText
                 )
             )
+        },
+        floatingActionButton = {
+            FloatingActionButton(
+                onClick = onAddResidentClick,
+                shape = RoundedCornerShape(18.dp),
+                containerColor = AppNavy,
+                contentColor = Color.White,
+                elevation = FloatingActionButtonDefaults.elevation(6.dp)
+            ) {
+                Icon(Icons.Default.PersonAdd, contentDescription = "Add Resident to this Room")
+            }
         }
     ) { padding ->
         Column(
@@ -129,8 +154,12 @@ fun RoomDetailsScreen(
                 .padding(horizontal = 20.dp, vertical = 12.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            if (room != null) {
-                val vacancy = room!!.bedCount - residents.size
+            val currentRoom = room
+
+            if (currentRoom == null) {
+                Text("Loading…", style = MaterialTheme.typography.bodyMedium, color = AppMuted)
+            } else {
+                val vacancy = currentRoom.bedCount - residents.size
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(24.dp),
@@ -147,13 +176,13 @@ fun RoomDetailsScreen(
                     ) {
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
-                                "Room ${room!!.roomNumber}",
+                                "Room ${currentRoom.roomNumber}",
                                 style = MaterialTheme.typography.titleLarge,
                                 fontWeight = FontWeight.Bold,
                                 color = AppText
                             )
                             Spacer(modifier = Modifier.height(4.dp))
-                            Text("Floor ${room!!.floor}", style = MaterialTheme.typography.bodyMedium, color = AppMuted)
+                            Text("Floor ${currentRoom.floor}", style = MaterialTheme.typography.bodyMedium, color = AppMuted)
                             Spacer(modifier = Modifier.height(8.dp))
                             Row {
                                 Box(
@@ -163,7 +192,7 @@ fun RoomDetailsScreen(
                                         .padding(horizontal = 10.dp, vertical = 4.dp)
                                 ) {
                                     Text(
-                                        "${room!!.bedCount} Beds",
+                                        "${currentRoom.bedCount} Beds",
                                         style = MaterialTheme.typography.bodySmall,
                                         color = AppNavy,
                                         fontWeight = FontWeight.SemiBold
@@ -188,11 +217,7 @@ fun RoomDetailsScreen(
 
                         Row {
                             IconButton(onClick = { showEditDialog = true }) {
-                                Icon(
-                                    Icons.Default.Edit,
-                                    contentDescription = "Edit Room",
-                                    tint = AppNavy
-                                )
+                                Icon(Icons.Default.Edit, contentDescription = "Edit Room", tint = AppNavy)
                             }
                             IconButton(onClick = {
                                 if (residents.isNotEmpty()) {
@@ -203,11 +228,7 @@ fun RoomDetailsScreen(
                                     showDeleteDialog = true
                                 }
                             }) {
-                                Icon(
-                                    Icons.Default.Delete,
-                                    contentDescription = "Delete Room",
-                                    tint = AppRed
-                                )
+                                Icon(Icons.Default.Delete, contentDescription = "Delete Room", tint = AppRed)
                             }
                         }
                     }
@@ -221,17 +242,21 @@ fun RoomDetailsScreen(
                 color = AppText,
                 modifier = Modifier.padding(top = 8.dp)
             )
-
             if (residents.isEmpty()) {
                 Card(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = 280.dp),
                     shape = RoundedCornerShape(20.dp),
                     colors = CardDefaults.cardColors(containerColor = AppCard),
                     border = BorderStroke(1.dp, AppBorder)
                 ) {
                     Column(
-                        modifier = Modifier.padding(24.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(24.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center
                     ) {
                         Box(
                             modifier = Modifier
@@ -240,19 +265,25 @@ fun RoomDetailsScreen(
                                 .background(AppSoftBlue),
                             contentAlignment = Alignment.Center
                         ) {
-                            Icon(
-                                Icons.Default.Bed,
-                                contentDescription = null,
-                                tint = AppNavy,
-                                modifier = Modifier.size(32.dp)
-                            )
+                            Icon(Icons.Default.Bed, contentDescription = null, tint = AppNavy, modifier = Modifier.size(32.dp))
                         }
                         Spacer(modifier = Modifier.height(12.dp))
                         Text(
                             "No residents currently in this room.",
                             style = MaterialTheme.typography.bodyLarge,
-                            color = AppMuted
+                            color = AppMuted,
+                            textAlign = TextAlign.Center
                         )
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Button(
+                            onClick = onAddResidentClick,
+                            shape = RoundedCornerShape(14.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = AppSoftGreen)
+                        ) {
+                            Icon(Icons.Default.PersonAdd, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Add Resident to this Room", fontWeight = FontWeight.Bold)
+                        }
                     }
                 }
             } else {
@@ -271,11 +302,10 @@ fun RoomDetailsScreen(
         }
     }
 
-    val currentRoom = room
-
-    if (showEditDialog && currentRoom != null) {
+    // 1. EDIT DIALOG
+    if (showEditDialog && room != null) {
         EditRoomDialog(
-            room = currentRoom,
+            room = room!!,
             occupiedBeds = residents.size,
             onDismiss = { showEditDialog = false },
             onConfirm = { number, floor, beds, rentPaise ->
@@ -285,6 +315,7 @@ fun RoomDetailsScreen(
         )
     }
 
+    // 2. RENT REVISION DIALOG
     val prompt = rentPrompt
     if (prompt != null) {
         AlertDialog(
@@ -314,7 +345,8 @@ fun RoomDetailsScreen(
         )
     }
 
-    if (showOccupiedDialog && currentRoom != null) {
+    // 3. OCCUPIED DIALOG
+    if (showOccupiedDialog && room != null) {
         AlertDialog(
             onDismissRequest = { showOccupiedDialog = false },
             shape = RoundedCornerShape(24.dp),
@@ -324,7 +356,7 @@ fun RoomDetailsScreen(
             title = { Text("Can't remove this room", fontWeight = FontWeight.Bold) },
             text = {
                 Text(
-                    "${residents.size} resident(s) still live in Room ${currentRoom.roomNumber}.\n\n" +
+                    "${residents.size} resident(s) still live in Room ${room!!.roomNumber}.\n\n" +
                             "Move them to another room or check them out first."
                 )
             },
@@ -336,7 +368,8 @@ fun RoomDetailsScreen(
         )
     }
 
-    if (showArchiveDialog && currentRoom != null) {
+    // 4. ARCHIVE DIALOG
+    if (showArchiveDialog && room != null) {
         AlertDialog(
             onDismissRequest = { showArchiveDialog = false },
             shape = RoundedCornerShape(24.dp),
@@ -346,7 +379,7 @@ fun RoomDetailsScreen(
             title = { Text("Hide this room?", fontWeight = FontWeight.Bold) },
             text = {
                 Text(
-                    "Room ${currentRoom.roomNumber} has been used before, so we'll hide it instead of deleting it, to keep past records.\n\n" +
+                    "Room ${room!!.roomNumber} has been used before, so we'll hide it instead of deleting it, to keep past records.\n\n" +
                             "It won't be available for new residents."
                 )
             },
@@ -362,7 +395,8 @@ fun RoomDetailsScreen(
         )
     }
 
-    if (showDeleteDialog && currentRoom != null) {
+    // 5. DELETE DIALOG
+    if (showDeleteDialog && room != null) {
         AlertDialog(
             onDismissRequest = { showDeleteDialog = false },
             shape = RoundedCornerShape(24.dp),
@@ -372,7 +406,7 @@ fun RoomDetailsScreen(
             title = { Text("Delete permanently?", fontWeight = FontWeight.Bold) },
             text = {
                 Text(
-                    "Room ${currentRoom.roomNumber} was never used, so there's nothing to keep.\n\n" +
+                    "Room ${room!!.roomNumber} was never used, so there's nothing to keep.\n\n" +
                             "This can't be undone."
                 )
             },
@@ -390,24 +424,20 @@ fun RoomDetailsScreen(
 }
 
 @Composable
-fun ResidentDetailCard(residentWithRoom: ResidentWithRoom, onClick: () -> Unit) {
+private fun ResidentDetailCard(residentWithRoom: ResidentWithRoom, onClick: () -> Unit) {
     val person = residentWithRoom.person
     val context = LocalContext.current
     var showMessageDialog by remember { mutableStateOf(false) }
 
     Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable { onClick() },
+        modifier = Modifier.fillMaxWidth().clickable { onClick() },
         shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(containerColor = AppCard),
         border = BorderStroke(1.dp, AppBorder),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
+            modifier = Modifier.fillMaxWidth().padding(16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             ResidentAvatar(photoPath = person.profilePhotoPath)
@@ -422,7 +452,11 @@ fun ResidentDetailCard(residentWithRoom: ResidentWithRoom, onClick: () -> Unit) 
             Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                 IconButton(onClick = {
                     val intent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:${person.phone}"))
-                    context.startActivity(intent)
+                    try {
+                        context.startActivity(intent)
+                    } catch (e: ActivityNotFoundException) {
+                        Toast.makeText(context, "No dialer app found", Toast.LENGTH_SHORT).show()
+                    }
                 }) {
                     Icon(Icons.Default.Call, contentDescription = "Call", tint = AppNavy)
                 }
@@ -435,7 +469,7 @@ fun ResidentDetailCard(residentWithRoom: ResidentWithRoom, onClick: () -> Unit) 
 
     if (showMessageDialog) {
         val rentAmount = residentWithRoom.monthlyRent / 100
-
+        // MessageChoiceDialog is the shared one from ui.residents (WhatsApp/SMS buttons with logos)
         MessageChoiceDialog(
             personName = person.name,
             phone = person.phone,
@@ -448,7 +482,11 @@ fun ResidentDetailCard(residentWithRoom: ResidentWithRoom, onClick: () -> Unit) 
                 val encodedMessage = URLEncoder.encode(message, "UTF-8")
                 val whatsappUri = Uri.parse("https://wa.me/$whatsappNumber?text=$encodedMessage")
                 val intent = Intent(Intent.ACTION_VIEW, whatsappUri)
-                context.startActivity(intent)
+                try {
+                    context.startActivity(intent)
+                } catch (e: ActivityNotFoundException) {
+                    Toast.makeText(context, "WhatsApp not installed", Toast.LENGTH_SHORT).show()
+                }
                 showMessageDialog = false
             },
             onSmsClick = {
@@ -456,51 +494,13 @@ fun ResidentDetailCard(residentWithRoom: ResidentWithRoom, onClick: () -> Unit) 
                 val message = "Hi ${person.name},\nPlease pay the rent ₹$rentAmount for $monthName.\nThanks!"
                 val intent = Intent(Intent.ACTION_SENDTO, Uri.parse("smsto:${person.phone}"))
                 intent.putExtra("sms_body", message)
-                context.startActivity(intent)
+                try {
+                    context.startActivity(intent)
+                } catch (e: ActivityNotFoundException) {
+                    Toast.makeText(context, "No SMS app found", Toast.LENGTH_SHORT).show()
+                }
                 showMessageDialog = false
             }
         )
     }
-}
-
-@Composable
-fun MessageChoiceDialog(
-    personName: String,
-    phone: String,
-    rentAmount: Long,
-    onDismiss: () -> Unit,
-    onWhatsAppClick: () -> Unit,
-    onSmsClick: () -> Unit
-) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        shape = RoundedCornerShape(24.dp),
-        containerColor = AppCard,
-        titleContentColor = AppText,
-        textContentColor = AppMuted,
-        title = { Text("Send Message", fontWeight = FontWeight.Bold) },
-        text = {
-            Column {
-                Text("Choose how to send the rent reminder to $personName:")
-                Spacer(modifier = Modifier.height(16.dp))
-                TextButton(
-                    onClick = onWhatsAppClick,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text("💬 WhatsApp", color = AppGreen, fontWeight = FontWeight.Bold)
-                }
-                TextButton(
-                    onClick = onSmsClick,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text("📱 SMS", color = AppNavy, fontWeight = FontWeight.Bold)
-                }
-            }
-        },
-        confirmButton = {
-            TextButton(onClick = onDismiss) {
-                Text("Cancel", color = AppMuted)
-            }
-        }
-    )
 }

@@ -2,6 +2,7 @@ package com.example.hostelmanager.ui.residents
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -20,6 +21,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.CalendarToday
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -27,10 +29,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ExposedDropdownMenuBox
-import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -64,6 +63,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.hostelmanager.data.RoomWithOccupancy
+import com.example.hostelmanager.ui.rooms.RoomPickerDialog
 import com.example.hostelmanager.ui.theme.AppBackground
 import com.example.hostelmanager.ui.theme.AppBorder
 import com.example.hostelmanager.ui.theme.AppCard
@@ -96,21 +96,19 @@ fun TransferRoomScreen(
     val scope = rememberCoroutineScope()
     val focusManager = LocalFocusManager.current
 
-    // Memoized so filtering only runs when room list or current room changes
     val transferTargets = remember(allRooms, currentRoom) {
         allRooms.filter { it.room.id != currentRoom?.id && (it.room.bedCount - it.occupiedBeds) > 0 }
     }
 
     var selectedRoom by remember { mutableStateOf<RoomWithOccupancy?>(null) }
-    var expandedRoom by remember { mutableStateOf(false) }
     var transferDate by remember {
         mutableStateOf(LocalDate.now().format(DateTimeFormatter.ISO_LOCAL_DATE))
     }
     var rent by remember { mutableStateOf("") }
     var showDatePicker by remember { mutableStateOf(false) }
+    var showRoomPicker by remember { mutableStateOf(false) } // NEW
     var showConfirmDialog by remember { mutableStateOf(false) }
 
-    // Parse joinDate once and validate both format & chronological order
     val joinLocalDate = remember(stay?.joinDate) {
         stay?.joinDate?.let { runCatching { LocalDate.parse(it) }.getOrNull() }
     }
@@ -123,7 +121,6 @@ fun TransferRoomScreen(
         } else null
     }
 
-    // Keep DatePicker in sync with joinDate (disables invalid past dates)
     val latestMinDateMillis by rememberUpdatedState(
         joinLocalDate?.atStartOfDay(ZoneOffset.UTC)?.toInstant()?.toEpochMilli()
     )
@@ -190,7 +187,6 @@ fun TransferRoomScreen(
                 fontWeight = FontWeight.Bold
             )
 
-            // Current stay (read-only)
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(20.dp),
@@ -227,43 +223,39 @@ fun TransferRoomScreen(
 
             SectionHeader("Transfer To")
 
-            ExposedDropdownMenuBox(
-                expanded = expandedRoom,
-                onExpandedChange = { expandedRoom = !expandedRoom }
-            ) {
+            // ✅ FIXED: Use Box + pointerInput for reliable mobile taps
+            val currentSelectedRoom = selectedRoom
+            Box(modifier = Modifier.fillMaxWidth()) {
                 OutlinedTextField(
-                    value = selectedRoom?.room?.roomNumber ?: "",
+                    value = currentSelectedRoom?.room?.roomNumber ?: "",
                     onValueChange = { },
                     readOnly = true,
                     singleLine = true,
                     label = { Text("New Room *") },
-                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expandedRoom) },
-                    modifier = Modifier.fillMaxWidth().menuAnchor(),
+                    placeholder = { Text("Tap to search rooms", color = AppMuted) },
+                    trailingIcon = {
+                        Icon(Icons.Default.Search, contentDescription = "Search rooms", tint = AppNavy)
+                    },
+                    modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(12.dp),
-                    colors = textFieldColors
-                )
-                ExposedDropdownMenu(
-                    expanded = expandedRoom,
-                    onDismissRequest = { expandedRoom = false }
-                ) {
-                    if (transferTargets.isEmpty()) {
-                        DropdownMenuItem(
-                            text = { Text("No other rooms with vacancy") },
-                            onClick = { expandedRoom = false }
-                        )
-                    } else {
-                        transferTargets.forEach { roomWithOcc ->
-                            val vacancy = roomWithOcc.room.bedCount - roomWithOcc.occupiedBeds
-                            DropdownMenuItem(
-                                text = { Text("Room ${roomWithOcc.room.roomNumber} (Vacancy: $vacancy)") },
-                                onClick = {
-                                    selectedRoom = roomWithOcc
-                                    expandedRoom = false
-                                }
+                    colors = textFieldColors,
+                    supportingText = {
+                        if (currentSelectedRoom != null) {
+                            val vacancy = currentSelectedRoom.room.bedCount - currentSelectedRoom.occupiedBeds
+                            Text(
+                                "Beds: ${currentSelectedRoom.room.bedCount} · Vacancy: $vacancy",
+                                color = AppMuted
                             )
                         }
                     }
-                }
+                )
+
+                // Overlay: topmost child, catches the tap
+                Box(
+                    modifier = Modifier
+                        .matchParentSize()
+                        .clickable { showRoomPicker = true }
+                )
             }
 
             OutlinedTextField(
@@ -276,8 +268,7 @@ fun TransferRoomScreen(
                 singleLine = true,
                 isError = dateError != null,
                 supportingText = dateError?.let { { Text(it) } },
-
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number,imeAction = ImeAction.Next),
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Next),
                 keyboardActions = KeyboardActions(
                     onNext = { focusManager.moveFocus(FocusDirection.Down) }
                 ),
@@ -290,7 +281,7 @@ fun TransferRoomScreen(
 
             OutlinedTextField(
                 value = rent,
-                onValueChange = { input -> rent = input.filter { it.isDigit() } },
+                onValueChange = { input -> rent = input.filter { it.isDigit() }.take(5) },
                 label = { Text("New Monthly Rent (₹) *") },
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(12.dp),
@@ -301,10 +292,7 @@ fun TransferRoomScreen(
                     imeAction = ImeAction.Done
                 ),
                 keyboardActions = KeyboardActions(
-                    onDone = {
-                        focusManager.clearFocus()
-                       // if (isFormValid) showConfirmDialog = true
-                    }
+                    onDone = { focusManager.clearFocus() }
                 )
             )
 
@@ -336,6 +324,18 @@ fun TransferRoomScreen(
                 )
             }
         }
+    }
+
+    // ✅ Room Picker Dialog
+    if (showRoomPicker) {
+        RoomPickerDialog(
+            rooms = transferTargets,
+            onDismiss = { showRoomPicker = false },
+            onSelect = { room ->
+                selectedRoom = room
+                rent = (room.room.defaultRentPerBed / 100).toString()
+            }
+        )
     }
 
     if (showDatePicker) {
@@ -396,7 +396,6 @@ fun TransferRoomScreen(
     }
 }
 
-// Reusable helpers for consistent styling
 @Composable
 private fun SectionHeader(title: String) {
     Column(modifier = Modifier.padding(top = 4.dp)) {

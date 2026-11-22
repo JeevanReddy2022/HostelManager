@@ -1,7 +1,9 @@
 package com.example.hostelmanager.ui.residents
 
+import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.net.Uri
+import android.widget.Toast
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -16,7 +18,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -123,7 +124,11 @@ fun ResidentDetailsScreen(
                     person?.let { p ->
                         IconButton(onClick = {
                             val intent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:${p.phone}"))
-                            context.startActivity(intent)
+                            try {
+                                context.startActivity(intent)
+                            } catch (e: ActivityNotFoundException) {
+                                Toast.makeText(context, "No dialer app found", Toast.LENGTH_SHORT).show()
+                            }
                         }) {
                             Icon(Icons.Default.Call, contentDescription = "Call", tint = AppNavy)
                         }
@@ -298,29 +303,39 @@ fun ResidentDetailsScreen(
         )
     }
 
-    // Message Choice Dialog
-    if (showMessageDialog && person != null && activeStay != null) {
-        val rentAmount = activeStay!!.monthlyRent / 100
+    // Message Choice Dialog (MessageChoiceDialog lives in ResidentListScreen.kt, same package)
+    val dialogPerson = person
+    val dialogStay = activeStay
+    if (showMessageDialog && dialogPerson != null && dialogStay != null) {
+        val rentAmount = dialogStay.monthlyRent / 100
         MessageChoiceDialog(
-            personName = person!!.name,
-            phone = person!!.phone,
+            personName = dialogPerson.name,
+            phone = dialogPerson.phone,
             rentAmount = rentAmount,
             onDismiss = { showMessageDialog = false },
             onWhatsAppClick = {
                 val monthName = LocalDate.now().month.getDisplayName(TextStyle.FULL, Locale.getDefault())
-                val message = "Hi ${person!!.name},\nPlease pay the rent ₹$rentAmount for $monthName.\nThanks!"
-                val whatsappNumber = "91${person!!.phone}"
+                val message = "Hi ${dialogPerson.name},\nPlease pay the rent ₹$rentAmount for $monthName.\nThanks!"
+                val whatsappNumber = "91${dialogPerson.phone}"
                 val encodedMessage = URLEncoder.encode(message, "UTF-8")
                 val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://wa.me/$whatsappNumber?text=$encodedMessage"))
-                context.startActivity(intent)
+                try {
+                    context.startActivity(intent)
+                } catch (e: ActivityNotFoundException) {
+                    Toast.makeText(context, "WhatsApp not installed", Toast.LENGTH_SHORT).show()
+                }
                 showMessageDialog = false
             },
             onSmsClick = {
                 val monthName = LocalDate.now().month.getDisplayName(TextStyle.FULL, Locale.getDefault())
-                val message = "Hi ${person!!.name},\nPlease pay the rent ₹$rentAmount for $monthName.\nThanks!"
-                val intent = Intent(Intent.ACTION_SENDTO, Uri.parse("smsto:${person!!.phone}"))
+                val message = "Hi ${dialogPerson.name},\nPlease pay the rent ₹$rentAmount for $monthName.\nThanks!"
+                val intent = Intent(Intent.ACTION_SENDTO, Uri.parse("smsto:${dialogPerson.phone}"))
                 intent.putExtra("sms_body", message)
-                context.startActivity(intent)
+                try {
+                    context.startActivity(intent)
+                } catch (e: ActivityNotFoundException) {
+                    Toast.makeText(context, "No SMS app found", Toast.LENGTH_SHORT).show()
+                }
                 showMessageDialog = false
             }
         )
@@ -351,7 +366,6 @@ fun ResidentDetailsScreen(
     }
 }
 
-// SIMPLIFIED: Removed ColumnScope to prevent compiler confusion
 @Composable
 private fun PremiumCard(content: @Composable () -> Unit) {
     Card(

@@ -1,6 +1,7 @@
 package com.example.hostelmanager.ui.residents
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -18,6 +19,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.CalendarToday
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DatePicker
@@ -56,6 +58,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.hostelmanager.data.RoomWithOccupancy
 import com.example.hostelmanager.ui.components.ImagePickerField
+import com.example.hostelmanager.ui.rooms.RoomPickerDialog
 import com.example.hostelmanager.ui.theme.AppBackground
 import com.example.hostelmanager.ui.theme.AppBorder
 import com.example.hostelmanager.ui.theme.AppMuted
@@ -65,20 +68,20 @@ import com.example.hostelmanager.ui.theme.AppText
 import kotlinx.coroutines.launch
 import java.time.Instant
 import java.time.LocalDate
-import java.time.ZoneId
+import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AddResidentScreen(
     hostelId: String,
+    prefilledRoomId: String = "", // room to pre-select ("none" or "" = no prefill)
     onBackClick: () -> Unit,
     viewModel: ResidentViewModel = viewModel()
 ) {
     LaunchedEffect(hostelId) { viewModel.setHostelId(hostelId) }
 
     val roomsWithOccupancy by viewModel.roomsForHostel.collectAsState()
-    val availableRooms = roomsWithOccupancy.filter { (it.room.bedCount - it.occupiedBeds) > 0 }
 
     val phoneError by viewModel.phoneError.collectAsState()
     val govtIdError by viewModel.govtIdError.collectAsState()
@@ -87,7 +90,6 @@ fun AddResidentScreen(
     val scope = rememberCoroutineScope()
     val focusManager = LocalFocusManager.current
 
-    // High-contrast, warm-colored text field styling
     val textFieldColors = OutlinedTextFieldDefaults.colors(
         focusedTextColor = AppText,
         unfocusedTextColor = AppText,
@@ -129,13 +131,25 @@ fun AddResidentScreen(
     var selectedGender by remember { mutableStateOf("Male") }
 
     var expandedIdType by remember { mutableStateOf(false) }
-    var expandedRoomSelect by remember { mutableStateOf(false) }
     var selectedRoom by remember { mutableStateOf<RoomWithOccupancy?>(null) }
+    var showRoomPicker by remember { mutableStateOf(false) }
 
     val joinDatePickerState = rememberDatePickerState()
     var showJoinDatePicker by remember { mutableStateOf(false) }
     val dobDatePickerState = rememberDatePickerState()
     var showDobDatePicker by remember { mutableStateOf(false) }
+
+    // Auto-select the room we navigated from (once, when rooms load)
+    var prefilledApplied by remember { mutableStateOf(false) }
+    LaunchedEffect(roomsWithOccupancy, prefilledRoomId) {
+        if (!prefilledApplied && prefilledRoomId.isNotBlank() && prefilledRoomId != "none") {
+            val match = roomsWithOccupancy.find { it.room.id == prefilledRoomId }
+            if (match != null) {
+                selectedRoom = match
+                prefilledApplied = true
+            }
+        }
+    }
 
     LaunchedEffect(govtId, selectedIdType) {
         if (selectedIdType == "Voter ID" || selectedIdType == "Driving License") {
@@ -144,15 +158,20 @@ fun AddResidentScreen(
         }
     }
 
+    // Auto-fill rent when a room is selected (also covers the prefilled room)
     LaunchedEffect(selectedRoom) {
-        if (selectedRoom != null && rent.isEmpty()) {
-            rent = (selectedRoom!!.room.defaultRentPerBed / 100).toString()
+        val r = selectedRoom
+        if (r != null && rent.isEmpty()) {
+            rent = (r.room.defaultRentPerBed / 100).toString()
         }
     }
 
-    val isPhoneValid = phone.matches(Regex("^\\d{10}$"))
-    val isEmergencyValid = emergency.matches(Regex("^\\d{10}$"))
+    val isPhoneValid = phone.matches(Regex("^[6-9]\\d{9}$"))
+    val isEmergencyValid = emergency.matches(Regex("^[6-9]\\d{9}$"))
+    val isNameValid = name.trim().length >= 4
+    val isGuardianValid = guardian.trim().length >= 4
     val isSameContact = phone.isNotBlank() && emergency.isNotBlank() && phone == emergency
+
 
     val isIdValid = when (selectedIdType) {
         "Aadhaar" -> govtId.matches(Regex("^[2-9][0-9]{11}$"))
@@ -179,13 +198,7 @@ fun AddResidentScreen(
         containerColor = AppBackground,
         topBar = {
             TopAppBar(
-                title = {
-                    Text(
-                        "Add Resident",
-                        fontWeight = FontWeight.Bold,
-                        color = AppText
-                    )
-                },
+                title = { Text("Add Resident", fontWeight = FontWeight.Bold, color = AppText) },
                 navigationIcon = {
                     IconButton(onClick = onBackClick) {
                         Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = AppText)
@@ -210,18 +223,23 @@ fun AddResidentScreen(
             SectionHeader("Personal Details")
 
             OutlinedTextField(
-                value = name, onValueChange = { name = it },
-                label = { Text("Name *") },
+                value = name,
+                onValueChange = { input -> name = input.filter { it.isLetter() || it == ' ' || it == '.' } },
+                label = { Text("Name * (min 4 characters)") },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
                 shape = RoundedCornerShape(12.dp),
                 colors = textFieldColors,
+                isError = name.isNotBlank() && !isNameValid,
+                supportingText = {
+                    if (name.isNotBlank() && !isNameValid) Text("Name must be at least 4 characters")
+                },
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
                 keyboardActions = KeyboardActions(onNext = { focusManager.moveFocus(FocusDirection.Down) })
             )
 
             OutlinedTextField(
-                value = phone, onValueChange = { input -> phone = input.filter { it.isDigit() } },
+                value = phone, onValueChange = { input -> phone = input.filter { it.isDigit() }.take(10) },
                 label = { Text("Phone (10 digits) *") },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
@@ -231,7 +249,7 @@ fun AddResidentScreen(
                 keyboardActions = KeyboardActions(onNext = { focusManager.moveFocus(FocusDirection.Down) }),
                 isError = (phone.isNotBlank() && !isPhoneValid) || phoneError != null,
                 supportingText = {
-                    if (phone.isNotBlank() && !isPhoneValid) Text("Must be exactly 10 digits")
+                    if (phone.isNotBlank() && !isPhoneValid) Text("Must be exactly 10 digits, starting with 6-9")
                     else if (phoneError != null) Text(phoneError!!)
                 }
             )
@@ -276,7 +294,7 @@ fun AddResidentScreen(
             )
 
             OutlinedTextField(
-                value = emergency, onValueChange = { input -> emergency = input.filter { it.isDigit() } },
+                value = emergency, onValueChange = { input -> emergency = input.filter { it.isDigit() }.take(10) },
                 label = { Text("Emergency Contact (10 digits) *") },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
@@ -289,7 +307,7 @@ fun AddResidentScreen(
                     if (isSameContact) {
                         Text("Emergency contact cannot be the same as the primary phone number")
                     } else if (emergency.isNotBlank() && !isEmergencyValid) {
-                        Text("Must be exactly 10 digits")
+                        Text("Must be exactly 10 digits, starting with 6-9")
                     } else if (emergencyError != null) {
                         Text(emergencyError!!)
                     }
@@ -303,13 +321,11 @@ fun AddResidentScreen(
                 singleLine = true,
                 shape = RoundedCornerShape(12.dp),
                 colors = textFieldColors,
-                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Next, ),
                 keyboardActions = KeyboardActions(onNext = { focusManager.moveFocus(FocusDirection.Down) }),
                 isError = dob.isNotBlank() && !isDobValid,
                 supportingText = {
-                    if (dob.isNotBlank() && !isDobValid) {
-                        Text("Invalid date or date is in the future")
-                    }
+                    if (dob.isNotBlank() && !isDobValid) Text("Invalid date or date is in the future")
                 },
                 trailingIcon = {
                     IconButton(onClick = { showDobDatePicker = true }) {
@@ -347,12 +363,17 @@ fun AddResidentScreen(
             }
 
             OutlinedTextField(
-                value = guardian, onValueChange = { guardian = it },
+                value = guardian,
+                onValueChange = { input -> guardian = input.filter { it.isLetter() || it == ' ' || it == '.' }},
                 label = { Text("Guardian Name") },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
                 shape = RoundedCornerShape(12.dp),
                 colors = textFieldColors,
+                isError = guardian.isNotBlank() && !isGuardianValid,
+                supportingText = {
+                    if (guardian.isNotBlank() && !isGuardianValid) Text("Name must be at least 4 characters")
+                },
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
                 keyboardActions = KeyboardActions(onNext = { focusManager.moveFocus(FocusDirection.Down) })
             )
@@ -360,29 +381,43 @@ fun AddResidentScreen(
             Spacer(modifier = Modifier.height(8.dp))
             SectionHeader("Stay Details")
 
-            ExposedDropdownMenuBox(expanded = expandedRoomSelect, onExpandedChange = { expandedRoomSelect = !expandedRoomSelect }) {
+            val currentRoom = selectedRoom
+            val selectedVacancy = currentRoom?.let { it.room.bedCount - it.occupiedBeds }
+
+            // FIX: the text field consumes touches, so a parent pointerInput never fires.
+            // A transparent clickable overlay (last child = topmost) catches the tap instead.
+            Box(modifier = Modifier.fillMaxWidth()) {
                 OutlinedTextField(
-                    value = selectedRoom?.room?.roomNumber ?: "", onValueChange = { }, readOnly = true,
+                    value = currentRoom?.let { "Room ${it.room.roomNumber}" } ?: "",
+                    onValueChange = { },
+                    readOnly = true,
                     label = { Text("Select Room *") },
-                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expandedRoomSelect) },
-                    modifier = Modifier.fillMaxWidth().menuAnchor(),
+                    placeholder = { Text("Tap to search rooms", color = AppMuted) },
+                    trailingIcon = {
+                        Icon(Icons.Default.Search, contentDescription = "Search rooms", tint = AppNavy)
+                    },
+                    modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
                     shape = RoundedCornerShape(12.dp),
-                    colors = textFieldColors
-                )
-                ExposedDropdownMenu(expanded = expandedRoomSelect, onDismissRequest = { expandedRoomSelect = false }) {
-                    if (availableRooms.isEmpty()) {
-                        DropdownMenuItem(text = { Text("No rooms with vacancy") }, onClick = { expandedRoomSelect = false })
-                    } else {
-                        availableRooms.forEach { roomWithOcc ->
-                            val vacancy = roomWithOcc.room.bedCount - roomWithOcc.occupiedBeds
-                            DropdownMenuItem(
-                                text = { Text("Room ${roomWithOcc.room.roomNumber} (Vacancy: $vacancy)") },
-                                onClick = { selectedRoom = roomWithOcc; expandedRoomSelect = false }
+                    colors = textFieldColors,
+                    supportingText = {
+                        if (currentRoom != null) {
+                            Text(
+                                "Beds: ${currentRoom.room.bedCount} · Vacancy: $selectedVacancy",
+                                color = AppMuted
                             )
                         }
                     }
-                }
+                )
+
+                Box(
+                    modifier = Modifier
+                        .matchParentSize()
+                        .clickable(onClickLabel = "Select room") {
+                            focusManager.clearFocus()
+                            showRoomPicker = true
+                        }
+                )
             }
 
             OutlinedTextField(
@@ -392,13 +427,11 @@ fun AddResidentScreen(
                 singleLine = true,
                 shape = RoundedCornerShape(12.dp),
                 colors = textFieldColors,
-                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Next),
                 keyboardActions = KeyboardActions(onNext = { focusManager.moveFocus(FocusDirection.Down) }),
                 isError = joinDate.isNotBlank() && !isJoinDateValid,
                 supportingText = {
-                    if (joinDate.isNotBlank() && !isJoinDateValid) {
-                        Text("Invalid date format. Use YYYY-MM-DD")
-                    }
+                    if (joinDate.isNotBlank() && !isJoinDateValid) Text("Invalid date format. Use YYYY-MM-DD")
                 },
                 trailingIcon = {
                     IconButton(onClick = { showJoinDatePicker = true }) {
@@ -409,8 +442,8 @@ fun AddResidentScreen(
 
             OutlinedTextField(
                 value = rent,
-                onValueChange = { input -> rent = input.filter { it.isDigit() } },
-                label = { Text("Monthly Rent (₹)") },
+                onValueChange = { input -> rent = input.filter { it.isDigit() }.take(5) },
+                label = { Text("Monthly Rent (₹) *") },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
                 shape = RoundedCornerShape(12.dp),
@@ -421,8 +454,8 @@ fun AddResidentScreen(
 
             OutlinedTextField(
                 value = deposit,
-                onValueChange = { input -> deposit = input.filter { it.isDigit() } },
-                label = { Text("Deposit Collected (₹)") },
+                onValueChange = { input -> deposit = input.filter { it.isDigit() }.take(5) },
+                label = { Text("Deposit Collected (₹) *") },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
                 shape = RoundedCornerShape(12.dp),
@@ -455,13 +488,14 @@ fun AddResidentScreen(
 
             Button(
                 onClick = {
+                    val roomToUse = selectedRoom ?: return@Button
                     val rentInPaise = rent.toLongOrNull()?.times(100) ?: 0L
                     val depositInPaise = deposit.toLongOrNull()?.times(100) ?: 0L
 
                     scope.launch {
                         val isSuccess = viewModel.addResident(
                             hostelId, name, phone, govtId, emergency, dob, address, selectedGender, guardian,
-                            selectedRoom!!.room.id, joinDate, rentInPaise, depositInPaise,
+                            roomToUse.room.id, joinDate, rentInPaise, depositInPaise,
                             govtFrontPath ?: "", govtBackPath ?: "", profilePhotoPath ?: ""
                         )
                         if (isSuccess) onBackClick()
@@ -491,13 +525,26 @@ fun AddResidentScreen(
         }
     }
 
+    if (showRoomPicker) {
+        RoomPickerDialog(
+            rooms = roomsWithOccupancy,
+            onDismiss = { showRoomPicker = false },
+            onSelect = { roomWithOcc ->
+                selectedRoom = roomWithOcc
+                rent = (roomWithOcc.room.defaultRentPerBed / 100).toString()
+            }
+        )
+    }
+
+    // DatePicker returns UTC-midnight millis, so convert with ZoneOffset.UTC
+    // (systemDefault() can shift the date by one day in negative-offset time zones).
     if (showJoinDatePicker) {
         DatePickerDialog(
             onDismissRequest = { showJoinDatePicker = false },
             confirmButton = {
                 TextButton(onClick = {
                     joinDatePickerState.selectedDateMillis?.let { millis ->
-                        val date = Instant.ofEpochMilli(millis).atZone(ZoneId.systemDefault()).toLocalDate()
+                        val date = Instant.ofEpochMilli(millis).atZone(ZoneOffset.UTC).toLocalDate()
                         joinDate = date.format(DateTimeFormatter.ISO_LOCAL_DATE)
                     }
                     showJoinDatePicker = false
@@ -517,7 +564,7 @@ fun AddResidentScreen(
             confirmButton = {
                 TextButton(onClick = {
                     dobDatePickerState.selectedDateMillis?.let { millis ->
-                        val date = Instant.ofEpochMilli(millis).atZone(ZoneId.systemDefault()).toLocalDate()
+                        val date = Instant.ofEpochMilli(millis).atZone(ZoneOffset.UTC).toLocalDate()
                         dob = date.format(DateTimeFormatter.ISO_LOCAL_DATE)
                     }
                     showDobDatePicker = false

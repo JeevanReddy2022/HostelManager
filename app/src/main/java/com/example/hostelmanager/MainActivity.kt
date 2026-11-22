@@ -44,7 +44,6 @@ class MainActivity : ComponentActivity() {
                         )
                     }
 
-                    // NEW: Dashboard screen (shows when clicking a hostel)
                     composable(
                         route = "dashboard/{hostelId}",
                         arguments = listOf(navArgument("hostelId") { type = NavType.StringType })
@@ -57,7 +56,6 @@ class MainActivity : ComponentActivity() {
                         )
                     }
 
-                    // Existing tabbed dashboard (now accessed via "Manage Hostel" button)
                     composable(
                         route = "hostel_dashboard/{hostelId}",
                         arguments = listOf(navArgument("hostelId") { type = NavType.StringType })
@@ -66,7 +64,8 @@ class MainActivity : ComponentActivity() {
                         HostelDashboardScreen(
                             hostelId = hostelId,
                             onBackClick = { navController.popBackStack() },
-                            onAddResidentClick = { navController.navigate("add_resident/$hostelId") },
+                            // ✅ Passes "none" when adding from the general Residents tab
+                            onAddResidentClick = { navController.navigate("add_resident/$hostelId/none") },
                             onRoomClick = { roomId -> navController.navigate("room_details/$hostelId/$roomId") },
                             onResidentClick = { personId -> navController.navigate("resident_details/$personId") },
                             onArchivedRoomsClick = { navController.navigate("archived_rooms/$hostelId") },
@@ -79,17 +78,27 @@ class MainActivity : ComponentActivity() {
                         )
                     }
 
+                    // ✅ UPDATED: Accepts an optional roomId to pre-fill the room picker
                     composable(
-                        route = "add_resident/{hostelId}",
-                        arguments = listOf(navArgument("hostelId") { type = NavType.StringType })
+                        route = "add_resident/{hostelId}/{roomId}",
+                        arguments = listOf(
+                            navArgument("hostelId") { type = NavType.StringType },
+                            navArgument("roomId") {
+                                type = NavType.StringType
+                                defaultValue = "none"
+                            }
+                        )
                     ) { backStackEntry ->
                         val hostelId = backStackEntry.arguments?.getString("hostelId") ?: ""
+                        val roomId = backStackEntry.arguments?.getString("roomId") ?: "none"
                         AddResidentScreen(
                             hostelId = hostelId,
+                            prefilledRoomId = roomId, // ✅ Passes the room ID to auto-select
                             onBackClick = { navController.popBackStack() }
                         )
                     }
 
+                    // ✅ UPDATED: Passes hostelId and the specific roomId to the Add Resident screen
                     composable(
                         route = "room_details/{hostelId}/{roomId}",
                         arguments = listOf(
@@ -97,11 +106,15 @@ class MainActivity : ComponentActivity() {
                             navArgument("roomId") { type = NavType.StringType }
                         )
                     ) { backStackEntry ->
+                        val hostelId = backStackEntry.arguments?.getString("hostelId") ?: ""
                         val roomId = backStackEntry.arguments?.getString("roomId") ?: ""
                         RoomDetailsScreen(
                             roomId = roomId,
+                            hostelId = hostelId,
                             onBackClick = { navController.popBackStack() },
-                            onResidentClick = { personId -> navController.navigate("resident_details/$personId") }
+                            onResidentClick = { personId -> navController.navigate("resident_details/$personId") },
+                            // ✅ Navigates to Add Resident with the current room's ID
+                            onAddResidentClick = { navController.navigate("add_resident/$hostelId/$roomId") }
                         )
                     }
 
@@ -177,6 +190,9 @@ class MainActivity : ComponentActivity() {
                             onBackClick = { navController.popBackStack() },
                             onReAdmitClick = { personId ->
                                 navController.navigate("readmit_resident/$hostelId/$personId")
+                            },
+                            onPastResidentClick = { personId ->
+                                navController.navigate("resident_details/$personId")
                             }
                         )
                     }
