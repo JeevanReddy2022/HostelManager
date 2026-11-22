@@ -105,4 +105,14 @@ interface PersonDao {
         ORDER BY p.name ASC
     """)
     fun getAllResidentsWithLatestStay(hostelId: String): Flow<List<ResidentWithStayInfo>>
+    // NEW: active resident names per room (for the room picker sharing view)
+    @Query("""
+        SELECT s.roomId AS roomId, p.name AS name
+        FROM persons p
+        INNER JOIN stays s ON p.id = s.personId
+        WHERE s.hostelId = :hostelId AND s.isActive = 1
+        ORDER BY p.name ASC
+    """)
+    fun getActiveResidentNamesByRoom(hostelId: String): Flow<List<RoomOccupant>>
 }
+data class RoomOccupant(val roomId: String, val name: String)

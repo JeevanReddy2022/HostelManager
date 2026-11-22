@@ -1,3 +1,4 @@
+
 package com.example.hostelmanager.ui.residents
 
 import androidx.compose.foundation.layout.Arrangement
@@ -234,3 +235,4 @@ fun ReAdmitResidentScreen(
         }
     }
 }
+

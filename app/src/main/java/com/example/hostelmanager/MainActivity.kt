@@ -9,6 +9,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import com.example.hostelmanager.ui.dashboard.DashboardScreen
 import com.example.hostelmanager.ui.dashboard.HostelDashboardScreen
 import com.example.hostelmanager.ui.expenses.AddExpenseScreen
 import com.example.hostelmanager.ui.hostels.HostelListScreen
@@ -38,11 +39,25 @@ class MainActivity : ComponentActivity() {
                     composable("hostel_list") {
                         HostelListScreen(
                             onHostelClick = { hostelId ->
-                                navController.navigate("hostel_dashboard/$hostelId")
+                                navController.navigate("dashboard/$hostelId")
                             }
                         )
                     }
 
+                    // NEW: Dashboard screen (shows when clicking a hostel)
+                    composable(
+                        route = "dashboard/{hostelId}",
+                        arguments = listOf(navArgument("hostelId") { type = NavType.StringType })
+                    ) { backStackEntry ->
+                        val hostelId = backStackEntry.arguments?.getString("hostelId") ?: ""
+                        DashboardScreen(
+                            hostelId = hostelId,
+                            onBackClick = { navController.popBackStack() },
+                            onManageHostelClick = { navController.navigate("hostel_dashboard/$hostelId") }
+                        )
+                    }
+
+                    // Existing tabbed dashboard (now accessed via "Manage Hostel" button)
                     composable(
                         route = "hostel_dashboard/{hostelId}",
                         arguments = listOf(navArgument("hostelId") { type = NavType.StringType })
@@ -215,7 +230,6 @@ class MainActivity : ComponentActivity() {
                         )
                     }
 
-                    // NEW: Add Expense screen
                     composable(
                         route = "add_expense/{hostelId}",
                         arguments = listOf(navArgument("hostelId") { type = NavType.StringType })

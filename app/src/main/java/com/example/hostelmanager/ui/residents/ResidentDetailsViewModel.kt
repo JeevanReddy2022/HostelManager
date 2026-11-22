@@ -14,6 +14,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
 
 class ResidentDetailsViewModel(application: Application) : AndroidViewModel(application) {
 
@@ -45,5 +46,11 @@ class ResidentDetailsViewModel(application: Application) : AndroidViewModel(appl
 
     fun setPersonId(id: String) {
         _personId.value = id
+    }
+    // <-- ADDED: delete payment function
+    fun deletePayment(paymentId: String) {
+        viewModelScope.launch {
+            paymentDao.deletePayment(paymentId)
+        }
     }
 }

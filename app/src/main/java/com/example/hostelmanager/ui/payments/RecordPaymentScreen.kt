@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -42,6 +43,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusDirection
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -53,6 +57,17 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
 private const val PENDING_BUFFER_RUPEES = 3000L
+
+// Helper: validate date is correct format and not in future
+private fun isValidPastOrTodayDate(dateStr: String): Boolean {
+    if (dateStr.isBlank()) return false
+    return try {
+        val date = LocalDate.parse(dateStr, DateTimeFormatter.ISO_LOCAL_DATE)
+        !date.isAfter(LocalDate.now())
+    } catch (e: Exception) {
+        false
+    }
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -67,15 +82,13 @@ fun RecordPaymentScreen(
     }
 
     val allResidents by viewModel.residents.collectAsState()
+    val focusManager = LocalFocusManager.current
 
     var searchQuery by remember { mutableStateOf("") }
     var selectedResident by remember { mutableStateOf<ResidentWithRoom?>(null) }
     var amount by remember { mutableStateOf("") }
 
-    // NEW: two date fields
-    var paymentDate by remember {
-        mutableStateOf("")
-    }
+    var paymentDate by remember { mutableStateOf("") }
     var recordedDate by remember {
         mutableStateOf(LocalDate.now().format(DateTimeFormatter.ISO_LOCAL_DATE))
     }
@@ -124,8 +137,15 @@ fun RecordPaymentScreen(
     val isAmountZeroOrNegative = amount.isNotBlank() && amountLong <= 0
     val isAmountExceeding = amount.isNotBlank() && amountLong > maxAllowed
 
+    // NEW: Date validations
+    val isPaymentDateValid = isValidPastOrTodayDate(paymentDate)
+    val isPaymentDateFuture = paymentDate.isNotBlank() && try {
+        LocalDate.parse(paymentDate, DateTimeFormatter.ISO_LOCAL_DATE).isAfter(LocalDate.now())
+    } catch (e: Exception) { false }
+    val isRecordedDateValid = isValidPastOrTodayDate(recordedDate)
+
     val isFormValid = selectedResident != null && amount.isNotBlank() && isAmountValid &&
-            paymentDate.isNotBlank() && recordedDate.isNotBlank()
+            isPaymentDateValid && isRecordedDateValid
 
     Scaffold(
         topBar = {
@@ -153,7 +173,10 @@ fun RecordPaymentScreen(
                     value = searchQuery,
                     onValueChange = { searchQuery = it },
                     label = { Text("Search resident (name, phone, or room)") },
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                    keyboardActions = KeyboardActions(onSearch = { focusManager.clearFocus() })
                 )
 
                 if (filteredResidents.isNotEmpty()) {
@@ -206,7 +229,9 @@ fun RecordPaymentScreen(
                 onValueChange = { input -> amount = input.filter { it.isDigit() } },
                 label = { Text("Amount (₹) *") },
                 modifier = Modifier.fillMaxWidth(),
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Next),
+                keyboardActions = KeyboardActions(onNext = { focusManager.moveFocus(FocusDirection.Down) }),
                 isError = amount.isNotBlank() && !isAmountValid,
                 supportingText = {
                     if (selectedResident != null) {
@@ -224,12 +249,25 @@ fun RecordPaymentScreen(
                 }
             )
 
-            // NEW: Payment Date (when money was received)
+            // Payment Date (when money was received) — with validation
             OutlinedTextField(
                 value = paymentDate,
                 onValueChange = { paymentDate = it },
                 label = { Text("Payment Date (when received) *") },
                 modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text, imeAction = ImeAction.Next),
+                keyboardActions = KeyboardActions(onNext = { focusManager.moveFocus(FocusDirection.Down) }),
+                isError = paymentDate.isNotBlank() && !isPaymentDateValid,
+                supportingText = {
+                    if (paymentDate.isNotBlank()) {
+                        if (isPaymentDateFuture) {
+                            Text("Payment date cannot be in the future", color = MaterialTheme.colorScheme.error)
+                        } else if (!isPaymentDateValid) {
+                            Text("Invalid date. Use YYYY-MM-DD format", color = MaterialTheme.colorScheme.error)
+                        }
+                    }
+                },
                 trailingIcon = {
                     IconButton(onClick = { showPaymentDatePicker = true }) {
                         Icon(Icons.Default.CalendarToday, contentDescription = "Pick payment date")
@@ -237,12 +275,21 @@ fun RecordPaymentScreen(
                 }
             )
 
-            // NEW: Recorded Date (when added to app)
+            // Recorded Date (when added to app) — with validation
             OutlinedTextField(
                 value = recordedDate,
                 onValueChange = { recordedDate = it },
                 label = { Text("Recorded Date (when added) *") },
                 modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text, imeAction = ImeAction.Next),
+                keyboardActions = KeyboardActions(onNext = { focusManager.moveFocus(FocusDirection.Down) }),
+                isError = recordedDate.isNotBlank() && !isRecordedDateValid,
+                supportingText = {
+                    if (recordedDate.isNotBlank() && !isRecordedDateValid) {
+                        Text("Invalid date. Use YYYY-MM-DD format", color = MaterialTheme.colorScheme.error)
+                    }
+                },
                 trailingIcon = {
                     IconButton(onClick = { showRecordedDatePicker = true }) {
                         Icon(Icons.Default.CalendarToday, contentDescription = "Pick recorded date")
@@ -260,7 +307,8 @@ fun RecordPaymentScreen(
                     readOnly = true,
                     label = { Text("Payment Mode *") },
                     trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expandedMode) },
-                    modifier = Modifier.fillMaxWidth().menuAnchor()
+                    modifier = Modifier.fillMaxWidth().menuAnchor(),
+                    singleLine = true
                 )
                 ExposedDropdownMenu(
                     expanded = expandedMode,
@@ -282,7 +330,10 @@ fun RecordPaymentScreen(
                 value = note,
                 onValueChange = { note = it },
                 label = { Text("Note (optional)") },
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus() })
             )
 
             Spacer(modifier = Modifier.height(16.dp))

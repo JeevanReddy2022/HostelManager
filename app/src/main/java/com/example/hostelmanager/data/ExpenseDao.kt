@@ -26,4 +26,24 @@ interface ExpenseDao {
 
     @Query("SELECT COALESCE(SUM(amountPaise), 0) FROM expenses WHERE hostelId = :hostelId")
     fun getTotalExpensesForHostel(hostelId: String): Flow<Long>
+    @Query("""
+    SELECT COALESCE(SUM(amountPaise), 0) FROM expenses 
+    WHERE hostelId = :hostelId 
+    AND expenseDate = :date
+""")
+    fun getTotalExpensesForDate(hostelId: String, date: String): Flow<Long>
+
+    @Query("""
+    SELECT COALESCE(SUM(amountPaise), 0) FROM expenses 
+    WHERE hostelId = :hostelId 
+    AND expenseDate LIKE :monthPattern
+""")
+    fun getTotalExpensesForMonth(hostelId: String, monthPattern: String): Flow<Long>
+
+    @Query("""
+    SELECT COALESCE(SUM(amountPaise), 0) FROM expenses 
+    WHERE hostelId = :hostelId 
+    AND expenseDate BETWEEN :startDate AND :endDate
+""")
+    fun getTotalExpensesBetween(hostelId: String, startDate: String, endDate: String): Flow<Long>
 }

@@ -2,8 +2,11 @@ package com.example.hostelmanager.ui.rooms
 
 import android.content.Intent
 import android.net.Uri
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -11,17 +14,22 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.Bed
 import androidx.compose.material.icons.filled.Call
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Message
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -30,6 +38,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -39,11 +48,24 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.hostelmanager.data.ResidentWithRoom
 import com.example.hostelmanager.ui.residents.ResidentAvatar
+import com.example.hostelmanager.ui.theme.AppBackground
+import com.example.hostelmanager.ui.theme.AppBorder
+import com.example.hostelmanager.ui.theme.AppCard
+import com.example.hostelmanager.ui.theme.AppGreen
+import com.example.hostelmanager.ui.theme.AppMuted
+import com.example.hostelmanager.ui.theme.AppNavy
+import com.example.hostelmanager.ui.theme.AppRed
+import com.example.hostelmanager.ui.theme.AppSoftBlue
+import com.example.hostelmanager.ui.theme.AppSoftGreen
+import com.example.hostelmanager.ui.theme.AppSoftRed
+import com.example.hostelmanager.ui.theme.AppText
 import java.net.URLEncoder
 import java.time.LocalDate
 import java.time.format.TextStyle
@@ -77,14 +99,26 @@ fun RoomDetailsScreen(
     }
 
     Scaffold(
+        containerColor = AppBackground,
         topBar = {
             TopAppBar(
-                title = { Text(room?.roomNumber ?: "Room Details") },
+                title = {
+                    Text(
+                        room?.roomNumber ?: "Room Details",
+                        fontWeight = FontWeight.Bold,
+                        color = AppText
+                    )
+                },
                 navigationIcon = {
                     IconButton(onClick = onBackClick) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+                        Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = AppText)
                     }
-                }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = AppBackground,
+                    titleContentColor = AppText,
+                    navigationIconContentColor = AppText
+                )
             )
         }
     ) { padding ->
@@ -92,23 +126,64 @@ fun RoomDetailsScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .padding(16.dp)
+                .padding(horizontal = 20.dp, vertical = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             if (room != null) {
                 val vacancy = room!!.bedCount - residents.size
-                Card(modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp)) {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(24.dp),
+                    colors = CardDefaults.cardColors(containerColor = AppCard),
+                    border = BorderStroke(1.dp, AppBorder),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                ) {
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(16.dp),
+                            .padding(20.dp),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Column(modifier = Modifier.weight(1f)) {
-                            Text("Room ${room!!.roomNumber}", style = MaterialTheme.typography.titleLarge)
-                            Text("Floor: ${room!!.floor}")
-                            Text("Beds: ${room!!.bedCount} | Vacancy: $vacancy")
-                            Text("Rent: ₹${room!!.defaultRentPerBed / 100}")
+                            Text(
+                                "Room ${room!!.roomNumber}",
+                                style = MaterialTheme.typography.titleLarge,
+                                fontWeight = FontWeight.Bold,
+                                color = AppText
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text("Floor ${room!!.floor}", style = MaterialTheme.typography.bodyMedium, color = AppMuted)
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Row {
+                                Box(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(50))
+                                        .background(AppSoftBlue)
+                                        .padding(horizontal = 10.dp, vertical = 4.dp)
+                                ) {
+                                    Text(
+                                        "${room!!.bedCount} Beds",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = AppNavy,
+                                        fontWeight = FontWeight.SemiBold
+                                    )
+                                }
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Box(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(50))
+                                        .background(if (vacancy <= 0) AppSoftRed else AppSoftGreen)
+                                        .padding(horizontal = 10.dp, vertical = 4.dp)
+                                ) {
+                                    Text(
+                                        if (vacancy <= 0) "Full" else "$vacancy Available",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = if (vacancy <= 0) AppRed else AppGreen,
+                                        fontWeight = FontWeight.SemiBold
+                                    )
+                                }
+                            }
                         }
 
                         Row {
@@ -116,7 +191,7 @@ fun RoomDetailsScreen(
                                 Icon(
                                     Icons.Default.Edit,
                                     contentDescription = "Edit Room",
-                                    tint = MaterialTheme.colorScheme.primary
+                                    tint = AppNavy
                                 )
                             }
                             IconButton(onClick = {
@@ -131,7 +206,7 @@ fun RoomDetailsScreen(
                                 Icon(
                                     Icons.Default.Delete,
                                     contentDescription = "Delete Room",
-                                    tint = MaterialTheme.colorScheme.error
+                                    tint = AppRed
                                 )
                             }
                         }
@@ -139,14 +214,51 @@ fun RoomDetailsScreen(
                 }
             }
 
-            Text("Residents in this room:", style = MaterialTheme.typography.titleMedium)
+            Text(
+                "Residents in this room:",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                color = AppText,
+                modifier = Modifier.padding(top = 8.dp)
+            )
 
             if (residents.isEmpty()) {
-                Text("No residents currently in this room.", modifier = Modifier.padding(top = 8.dp))
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(20.dp),
+                    colors = CardDefaults.cardColors(containerColor = AppCard),
+                    border = BorderStroke(1.dp, AppBorder)
+                ) {
+                    Column(
+                        modifier = Modifier.padding(24.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(64.dp)
+                                .clip(CircleShape)
+                                .background(AppSoftBlue),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                Icons.Default.Bed,
+                                contentDescription = null,
+                                tint = AppNavy,
+                                modifier = Modifier.size(32.dp)
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Text(
+                            "No residents currently in this room.",
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = AppMuted
+                        )
+                    }
+                }
             } else {
                 LazyColumn(
                     modifier = Modifier.fillMaxSize(),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     items(residents) { residentWithRoom ->
                         ResidentDetailCard(
@@ -161,7 +273,6 @@ fun RoomDetailsScreen(
 
     val currentRoom = room
 
-    // 1. EDIT DIALOG
     if (showEditDialog && currentRoom != null) {
         EditRoomDialog(
             room = currentRoom,
@@ -174,12 +285,15 @@ fun RoomDetailsScreen(
         )
     }
 
-    // 2. RENT REVISION DIALOG
     val prompt = rentPrompt
     if (prompt != null) {
         AlertDialog(
             onDismissRequest = { viewModel.dismissRentPrompt() },
-            title = { Text("Update residents' rent?") },
+            shape = RoundedCornerShape(24.dp),
+            containerColor = AppCard,
+            titleContentColor = AppText,
+            textContentColor = AppMuted,
+            title = { Text("Update residents' rent?", fontWeight = FontWeight.Bold) },
             text = {
                 Text(
                     "Room rent changed from ₹${prompt.oldRentPaise / 100} to ₹${prompt.newRentPaise / 100}.\n\n" +
@@ -189,22 +303,25 @@ fun RoomDetailsScreen(
             },
             confirmButton = {
                 TextButton(onClick = { viewModel.applyRentToAllResidents() }) {
-                    Text("Yes, update all")
+                    Text("Yes, update all", color = AppGreen, fontWeight = FontWeight.Bold)
                 }
             },
             dismissButton = {
                 TextButton(onClick = { viewModel.dismissRentPrompt() }) {
-                    Text("No, keep existing")
+                    Text("No, keep existing", color = AppMuted)
                 }
             }
         )
     }
 
-    // 3. OCCUPIED DIALOG (Refuse deletion)
     if (showOccupiedDialog && currentRoom != null) {
         AlertDialog(
             onDismissRequest = { showOccupiedDialog = false },
-            title = { Text("Can't remove this room") },
+            shape = RoundedCornerShape(24.dp),
+            containerColor = AppCard,
+            titleContentColor = AppText,
+            textContentColor = AppMuted,
+            title = { Text("Can't remove this room", fontWeight = FontWeight.Bold) },
             text = {
                 Text(
                     "${residents.size} resident(s) still live in Room ${currentRoom.roomNumber}.\n\n" +
@@ -213,17 +330,20 @@ fun RoomDetailsScreen(
             },
             confirmButton = {
                 TextButton(onClick = { showOccupiedDialog = false }) {
-                    Text("OK")
+                    Text("OK", color = AppNavy, fontWeight = FontWeight.Bold)
                 }
             }
         )
     }
 
-    // 4. ARCHIVE DIALOG (Hide used room)
     if (showArchiveDialog && currentRoom != null) {
         AlertDialog(
             onDismissRequest = { showArchiveDialog = false },
-            title = { Text("Hide this room?") },
+            shape = RoundedCornerShape(24.dp),
+            containerColor = AppCard,
+            titleContentColor = AppText,
+            textContentColor = AppMuted,
+            title = { Text("Hide this room?", fontWeight = FontWeight.Bold) },
             text = {
                 Text(
                     "Room ${currentRoom.roomNumber} has been used before, so we'll hide it instead of deleting it, to keep past records.\n\n" +
@@ -234,19 +354,22 @@ fun RoomDetailsScreen(
                 TextButton(onClick = {
                     showArchiveDialog = false
                     viewModel.archiveRoom()
-                }) { Text("Hide") }
+                }) { Text("Hide", color = AppNavy, fontWeight = FontWeight.Bold) }
             },
             dismissButton = {
-                TextButton(onClick = { showArchiveDialog = false }) { Text("Cancel") }
+                TextButton(onClick = { showArchiveDialog = false }) { Text("Cancel", color = AppMuted) }
             }
         )
     }
 
-    // 5. DELETE DIALOG (Permanently erase unused room)
     if (showDeleteDialog && currentRoom != null) {
         AlertDialog(
             onDismissRequest = { showDeleteDialog = false },
-            title = { Text("Delete permanently?") },
+            shape = RoundedCornerShape(24.dp),
+            containerColor = AppCard,
+            titleContentColor = AppText,
+            textContentColor = AppMuted,
+            title = { Text("Delete permanently?", fontWeight = FontWeight.Bold) },
             text = {
                 Text(
                     "Room ${currentRoom.roomNumber} was never used, so there's nothing to keep.\n\n" +
@@ -257,10 +380,10 @@ fun RoomDetailsScreen(
                 TextButton(onClick = {
                     showDeleteDialog = false
                     viewModel.deleteRoomPermanently()
-                }) { Text("Delete") }
+                }) { Text("Delete", color = AppRed, fontWeight = FontWeight.Bold) }
             },
             dismissButton = {
-                TextButton(onClick = { showDeleteDialog = false }) { Text("Cancel") }
+                TextButton(onClick = { showDeleteDialog = false }) { Text("Cancel", color = AppMuted) }
             }
         )
     }
@@ -275,7 +398,11 @@ fun ResidentDetailCard(residentWithRoom: ResidentWithRoom, onClick: () -> Unit) 
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable { onClick() }
+            .clickable { onClick() },
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(containerColor = AppCard),
+        border = BorderStroke(1.dp, AppBorder),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Row(
             modifier = Modifier
@@ -283,34 +410,29 @@ fun ResidentDetailCard(residentWithRoom: ResidentWithRoom, onClick: () -> Unit) 
                 .padding(16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // ✅ 1. RESIDENT PHOTO ON THE LEFT
             ResidentAvatar(photoPath = person.profilePhotoPath)
-
             Spacer(modifier = Modifier.width(12.dp))
 
-            // MIDDLE: Name, phone, rent
             Column(modifier = Modifier.weight(1f)) {
-                Text(person.name, style = MaterialTheme.typography.titleMedium)
-                Text("📞 ${person.phone}", style = MaterialTheme.typography.bodyMedium)
-                Text("💰 Rent: ₹${residentWithRoom.monthlyRent / 100}", style = MaterialTheme.typography.bodyMedium)
+                Text(person.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = AppText)
+                Text("📞 ${person.phone}", style = MaterialTheme.typography.bodyMedium, color = AppMuted)
+                Text("💰 Rent: ₹${residentWithRoom.monthlyRent / 100}", style = MaterialTheme.typography.bodySmall, color = AppNavy, fontWeight = FontWeight.Medium)
             }
 
-            // RIGHT: Call + Message buttons
             Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                 IconButton(onClick = {
                     val intent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:${person.phone}"))
                     context.startActivity(intent)
                 }) {
-                    Icon(Icons.Default.Call, contentDescription = "Call", tint = MaterialTheme.colorScheme.primary)
+                    Icon(Icons.Default.Call, contentDescription = "Call", tint = AppNavy)
                 }
                 IconButton(onClick = { showMessageDialog = true }) {
-                    Icon(Icons.Default.Message, contentDescription = "Message", tint = MaterialTheme.colorScheme.primary)
+                    Icon(Icons.Default.Message, contentDescription = "Message", tint = AppNavy)
                 }
             }
         }
     }
 
-    // ✅ 2. WHATSAPP / SMS CHOICE DIALOG
     if (showMessageDialog) {
         val rentAmount = residentWithRoom.monthlyRent / 100
 
@@ -352,7 +474,11 @@ fun MessageChoiceDialog(
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Send Message") },
+        shape = RoundedCornerShape(24.dp),
+        containerColor = AppCard,
+        titleContentColor = AppText,
+        textContentColor = AppMuted,
+        title = { Text("Send Message", fontWeight = FontWeight.Bold) },
         text = {
             Column {
                 Text("Choose how to send the rent reminder to $personName:")
@@ -361,19 +487,19 @@ fun MessageChoiceDialog(
                     onClick = onWhatsAppClick,
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Text("💬 WhatsApp")
+                    Text("💬 WhatsApp", color = AppGreen, fontWeight = FontWeight.Bold)
                 }
                 TextButton(
                     onClick = onSmsClick,
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Text("📱 SMS")
+                    Text("📱 SMS", color = AppNavy, fontWeight = FontWeight.Bold)
                 }
             }
         },
         confirmButton = {
             TextButton(onClick = onDismiss) {
-                Text("Cancel")
+                Text("Cancel", color = AppMuted)
             }
         }
     )

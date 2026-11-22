@@ -40,4 +40,10 @@ interface RoomDao {
     // NEW: counts rooms with this number in this hostel (active + archived)
     @Query("SELECT COUNT(*) FROM rooms WHERE hostelId = :hostelId AND roomNumber = :roomNumber")
     suspend fun countRoomsWithNumber(hostelId: String, roomNumber: String): Int
+    @Query("""
+    SELECT COALESCE(SUM(bedCount), 0) FROM rooms 
+    WHERE hostelId = :hostelId 
+    AND isArchived = 0
+""")
+    fun getTotalBedsForHostel(hostelId: String): Flow<Int>
 }

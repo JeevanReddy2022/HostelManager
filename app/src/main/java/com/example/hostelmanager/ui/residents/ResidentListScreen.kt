@@ -2,6 +2,7 @@ package com.example.hostelmanager.ui.residents
 
 import android.content.Intent
 import android.net.Uri
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -18,6 +19,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Call
 import androidx.compose.material.icons.filled.Message
@@ -25,7 +27,9 @@ import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PersonAdd
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.FloatingActionButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -43,10 +47,19 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import com.example.hostelmanager.data.ResidentWithRoom
+import com.example.hostelmanager.ui.theme.AppBackground
+import com.example.hostelmanager.ui.theme.AppBorder
+import com.example.hostelmanager.ui.theme.AppCard
+import com.example.hostelmanager.ui.theme.AppGreen
+import com.example.hostelmanager.ui.theme.AppMuted
+import com.example.hostelmanager.ui.theme.AppNavy
+import com.example.hostelmanager.ui.theme.AppSoftBlue
+import com.example.hostelmanager.ui.theme.AppText
 import java.io.File
 import java.net.URLEncoder
 import java.time.LocalDate
@@ -59,37 +72,67 @@ fun ResidentListScreen(
     onAddClick: () -> Unit,
     onResidentClick: (String) -> Unit,
     modifier: Modifier = Modifier,
-    viewModel: ResidentListViewModel = viewModel()
+    viewModel: ResidentListViewModel = viewModel() // ✅ Reverted to your original ViewModel
 ) {
     LaunchedEffect(hostelId) {
         viewModel.setHostelId(hostelId)
     }
 
+    // ✅ This now correctly resolves to List<ResidentWithRoom>
     val residents by viewModel.residents.collectAsState()
 
-    Box(modifier = modifier.fillMaxSize()) {
-
+    Box(
+        modifier = modifier
+            .fillMaxSize()
+            .background(AppBackground)
+    ) {
         if (residents.isEmpty()) {
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(16.dp),
-                verticalArrangement = Arrangement.Center
+                    .padding(20.dp),
+                verticalArrangement = Arrangement.Center,
+                horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Text("No active residents in this hostel.", style = MaterialTheme.typography.titleMedium)
-                Text("Tap the person-icon button to admit a new resident.")
+                Box(
+                    modifier = Modifier
+                        .size(80.dp)
+                        .clip(CircleShape)
+                        .background(AppSoftBlue),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        Icons.Default.Person,
+                        contentDescription = null,
+                        tint = AppNavy,
+                        modifier = Modifier.size(40.dp)
+                    )
+                }
+                Spacer(modifier = Modifier.height(16.dp))
+                Text(
+                    "No active residents in this hostel.",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = AppText
+                )
+                Spacer(modifier = Modifier.height(6.dp))
+                Text(
+                    "Tap the + button to admit a new resident.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = AppMuted
+                )
             }
         } else {
             LazyColumn(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(horizontal = 16.dp)
+                    .padding(horizontal = 20.dp)
                     .padding(bottom = 88.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+                verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                items(residents) { residentWithRoom ->
+                items(residents) { residentWithRoom -> // ✅ Now correctly iterates over ResidentWithRoom
                     ResidentCard(
-                        residentWithRoom,
+                        residentWithRoom = residentWithRoom,
                         onClick = { onResidentClick(residentWithRoom.person.id) }
                     )
                 }
@@ -98,9 +141,13 @@ fun ResidentListScreen(
 
         FloatingActionButton(
             onClick = onAddClick,
+            shape = RoundedCornerShape(18.dp),
+            containerColor = AppNavy,
+            contentColor = androidx.compose.ui.graphics.Color.White,
+            elevation = FloatingActionButtonDefaults.elevation(6.dp),
             modifier = Modifier
                 .align(Alignment.BottomEnd)
-                .padding(16.dp)
+                .padding(20.dp)
         ) {
             Icon(Icons.Default.PersonAdd, contentDescription = "Add Resident")
         }
@@ -116,7 +163,11 @@ fun ResidentCard(residentWithRoom: ResidentWithRoom, onClick: () -> Unit) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable { onClick() }
+            .clickable { onClick() },
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(containerColor = AppCard),
+        border = BorderStroke(1.dp, AppBorder),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Row(
             modifier = Modifier
@@ -127,13 +178,49 @@ fun ResidentCard(residentWithRoom: ResidentWithRoom, onClick: () -> Unit) {
             // LEFT: Circular person photo
             ResidentAvatar(photoPath = person.profilePhotoPath)
 
-            Spacer(modifier = Modifier.width(12.dp))
+            Spacer(modifier = Modifier.width(14.dp))
 
             // MIDDLE: Name, room, rent
             Column(modifier = Modifier.weight(1f)) {
-                Text(person.name, style = MaterialTheme.typography.titleMedium)
-                Text("🛏️ Room: ${residentWithRoom.roomNumber}", style = MaterialTheme.typography.bodyMedium)
-                Text("💰 Rent: ₹${residentWithRoom.monthlyRent / 100}", style = MaterialTheme.typography.bodyMedium)
+                Text(
+                    person.name,
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = AppText
+                )
+
+                Spacer(modifier = Modifier.height(6.dp))
+
+                // Premium Pills for Room and Rent
+                Row {
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(50))
+                            .background(AppSoftBlue)
+                            .padding(horizontal = 10.dp, vertical = 4.dp)
+                    ) {
+                        Text(
+                            "Room ${residentWithRoom.roomNumber}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = AppNavy,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(50))
+                            .background(AppSoftBlue.copy(alpha = 0.6f))
+                            .padding(horizontal = 10.dp, vertical = 4.dp)
+                    ) {
+                        Text(
+                            "₹${residentWithRoom.monthlyRent / 100}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = AppNavy,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
+                }
             }
 
             // RIGHT: Call + Message buttons
@@ -147,7 +234,7 @@ fun ResidentCard(residentWithRoom: ResidentWithRoom, onClick: () -> Unit) {
                     Icon(
                         imageVector = Icons.Default.Call,
                         contentDescription = "Call",
-                        tint = MaterialTheme.colorScheme.primary
+                        tint = AppNavy
                     )
                 }
 
@@ -157,15 +244,15 @@ fun ResidentCard(residentWithRoom: ResidentWithRoom, onClick: () -> Unit) {
                     Icon(
                         imageVector = Icons.Default.Message,
                         contentDescription = "Message",
-                        tint = MaterialTheme.colorScheme.primary
+                        tint = AppNavy
                     )
                 }
             }
         }
     }
 
+    // WhatsApp/SMS Choice Dialog (Fully retained)
     if (showMessageDialog) {
-        // Define rentAmount here so the lambdas below can see it
         val rentAmount = residentWithRoom.monthlyRent / 100
 
         MessageChoiceDialog(
@@ -199,16 +286,17 @@ fun ResidentCard(residentWithRoom: ResidentWithRoom, onClick: () -> Unit) {
 fun ResidentAvatar(photoPath: String?) {
     Box(
         modifier = Modifier
-            .size(56.dp)
+            .size(52.dp)
             .clip(CircleShape)
-            .background(MaterialTheme.colorScheme.surfaceVariant),
+            .background(AppSoftBlue),
         contentAlignment = Alignment.Center
     ) {
         if (photoPath.isNullOrBlank()) {
             Icon(
                 imageVector = Icons.Default.Person,
                 contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                tint = AppNavy,
+                modifier = Modifier.size(26.dp)
             )
         } else {
             AsyncImage(
@@ -232,7 +320,13 @@ fun MessageChoiceDialog(
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Send Message") },
+        shape = RoundedCornerShape(24.dp),
+        containerColor = AppCard,
+        titleContentColor = AppText,
+        textContentColor = AppMuted,
+        title = {
+            Text("Send Message", fontWeight = FontWeight.Bold)
+        },
         text = {
             Column {
                 Text("Choose how to send the rent reminder to $personName:")
@@ -241,19 +335,19 @@ fun MessageChoiceDialog(
                     onClick = onWhatsAppClick,
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Text("💬 WhatsApp")
+                    Text("💬 WhatsApp", color = AppGreen, fontWeight = FontWeight.Bold)
                 }
                 TextButton(
                     onClick = onSmsClick,
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Text("📱 SMS")
+                    Text("📱 SMS", color = AppNavy, fontWeight = FontWeight.Bold)
                 }
             }
         },
         confirmButton = {
             TextButton(onClick = onDismiss) {
-                Text("Cancel")
+                Text("Cancel", color = AppMuted)
             }
         }
     )

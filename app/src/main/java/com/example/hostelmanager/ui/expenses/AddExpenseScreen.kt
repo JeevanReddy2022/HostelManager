@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -36,6 +37,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusDirection
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -46,6 +50,17 @@ import java.time.LocalDate
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
+// Helper: validate date is correct format and not in future
+private fun isValidPastOrTodayDate(dateStr: String): Boolean {
+    if (dateStr.isBlank()) return false
+    return try {
+        val date = LocalDate.parse(dateStr, DateTimeFormatter.ISO_LOCAL_DATE)
+        !date.isAfter(LocalDate.now())
+    } catch (e: Exception) {
+        false
+    }
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AddExpenseScreen(
@@ -53,9 +68,9 @@ fun AddExpenseScreen(
     onBackClick: () -> Unit,
     viewModel: AddExpenseViewModel = viewModel()
 ) {
-    // Expense date: empty by default — owner MUST pick it explicitly
+    val focusManager = LocalFocusManager.current
+
     var expenseDate by remember { mutableStateOf("") }
-    // Entered date: auto-filled with today
     var enteredDate by remember {
         mutableStateOf(LocalDate.now().format(DateTimeFormatter.ISO_LOCAL_DATE))
     }
@@ -78,7 +93,15 @@ fun AddExpenseScreen(
 
     val amountLong = amount.toLongOrNull() ?: 0L
     val isAmountValid = amountLong > 0
-    val isFormValid = expenseDate.isNotBlank() && enteredDate.isNotBlank() &&
+
+    // NEW: Date validations
+    val isExpenseDateValid = isValidPastOrTodayDate(expenseDate)
+    val isExpenseDateFuture = expenseDate.isNotBlank() && try {
+        LocalDate.parse(expenseDate, DateTimeFormatter.ISO_LOCAL_DATE).isAfter(LocalDate.now())
+    } catch (e: Exception) { false }
+    val isEnteredDateValid = isValidPastOrTodayDate(enteredDate)
+
+    val isFormValid = isExpenseDateValid && isEnteredDateValid &&
             selectedCategory.isNotBlank() && isAmountValid
 
     Scaffold(
@@ -101,12 +124,25 @@ fun AddExpenseScreen(
                 .verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            // Expense Date (when it actually occurred) — empty by default
+            // Expense Date (when it actually occurred) — with validation
             OutlinedTextField(
                 value = expenseDate,
                 onValueChange = { expenseDate = it },
                 label = { Text("Expense Date (when occurred) *") },
                 modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text, imeAction = ImeAction.Next),
+                keyboardActions = KeyboardActions(onNext = { focusManager.moveFocus(FocusDirection.Down) }),
+                isError = expenseDate.isNotBlank() && !isExpenseDateValid,
+                supportingText = {
+                    if (expenseDate.isNotBlank()) {
+                        if (isExpenseDateFuture) {
+                            Text("Expense date cannot be in the future", color = MaterialTheme.colorScheme.error)
+                        } else if (!isExpenseDateValid) {
+                            Text("Invalid date. Use YYYY-MM-DD format", color = MaterialTheme.colorScheme.error)
+                        }
+                    }
+                },
                 trailingIcon = {
                     IconButton(onClick = { showExpenseDatePicker = true }) {
                         Icon(Icons.Default.CalendarToday, contentDescription = "Pick expense date")
@@ -114,12 +150,21 @@ fun AddExpenseScreen(
                 }
             )
 
-            // Entered Date (when recorded in app) — auto-filled
+            // Entered Date (when recorded in app) — with validation
             OutlinedTextField(
                 value = enteredDate,
                 onValueChange = { enteredDate = it },
                 label = { Text("Recorded Date (when added) *") },
                 modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text, imeAction = ImeAction.Next),
+                keyboardActions = KeyboardActions(onNext = { focusManager.moveFocus(FocusDirection.Down) }),
+                isError = enteredDate.isNotBlank() && !isEnteredDateValid,
+                supportingText = {
+                    if (enteredDate.isNotBlank() && !isEnteredDateValid) {
+                        Text("Invalid date. Use YYYY-MM-DD format", color = MaterialTheme.colorScheme.error)
+                    }
+                },
                 trailingIcon = {
                     IconButton(onClick = { showEnteredDatePicker = true }) {
                         Icon(Icons.Default.CalendarToday, contentDescription = "Pick recorded date")
@@ -138,7 +183,8 @@ fun AddExpenseScreen(
                     readOnly = true,
                     label = { Text("Category *") },
                     trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expandedCategory) },
-                    modifier = Modifier.fillMaxWidth().menuAnchor()
+                    modifier = Modifier.fillMaxWidth().menuAnchor(),
+                    singleLine = true
                 )
                 ExposedDropdownMenu(
                     expanded = expandedCategory,
@@ -156,13 +202,15 @@ fun AddExpenseScreen(
                 }
             }
 
-            // Amount
+            // Amount — with IME action
             OutlinedTextField(
                 value = amount,
                 onValueChange = { input -> amount = input.filter { it.isDigit() } },
                 label = { Text("Amount (₹) *") },
                 modifier = Modifier.fillMaxWidth(),
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Next),
+                keyboardActions = KeyboardActions(onNext = { focusManager.moveFocus(FocusDirection.Down) }),
                 isError = amount.isNotBlank() && !isAmountValid,
                 supportingText = {
                     if (amount.isNotBlank() && !isAmountValid) {
@@ -171,12 +219,15 @@ fun AddExpenseScreen(
                 }
             )
 
-            // Note
+            // Note — last field, uses Done action
             OutlinedTextField(
                 value = note,
                 onValueChange = { note = it },
                 label = { Text("Note (optional)") },
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus() })
             )
 
             Spacer(modifier = Modifier.height(8.dp))

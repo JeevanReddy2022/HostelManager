@@ -1,18 +1,25 @@
 package com.example.hostelmanager.ui.residents
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
@@ -24,10 +31,12 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -39,11 +48,24 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusDirection
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.hostelmanager.ui.components.ImagePickerField
+import com.example.hostelmanager.ui.theme.AppBackground
+import com.example.hostelmanager.ui.theme.AppBorder
+import com.example.hostelmanager.ui.theme.AppMuted
+import com.example.hostelmanager.ui.theme.AppNavy
+import com.example.hostelmanager.ui.theme.AppRed
+import com.example.hostelmanager.ui.theme.AppText
 import kotlinx.coroutines.launch
 import java.time.Instant
+import java.time.LocalDate
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
@@ -52,9 +74,11 @@ import java.time.format.DateTimeFormatter
 fun EditResidentScreen(
     personId: String,
     onBackClick: () -> Unit,
-    viewModel: EditResidentViewModel = viewModel()
+    viewModel: EditResidentViewModel = viewModel() // ✅ Correct ViewModel
 ) {
-    LaunchedEffect(personId) { viewModel.setPersonId(personId) }
+    LaunchedEffect(personId) {
+        viewModel.setPersonId(personId)
+    }
 
     val person by viewModel.person.collectAsState()
     val phoneError by viewModel.phoneError.collectAsState()
@@ -62,6 +86,25 @@ fun EditResidentScreen(
     val emergencyError by viewModel.emergencyError.collectAsState()
 
     val scope = rememberCoroutineScope()
+    val focusManager = LocalFocusManager.current
+
+    // High-contrast, warm-colored text field styling
+    val textFieldColors = OutlinedTextFieldDefaults.colors(
+        focusedTextColor = AppText,
+        unfocusedTextColor = AppText,
+        disabledTextColor = AppMuted,
+        focusedLabelColor = AppNavy,
+        unfocusedLabelColor = AppMuted,
+        disabledLabelColor = AppMuted,
+        focusedBorderColor = AppNavy,
+        unfocusedBorderColor = AppBorder,
+        disabledBorderColor = AppBorder,
+        errorBorderColor = AppRed,
+        errorLabelColor = AppRed,
+        errorTextColor = AppText,
+        errorSupportingTextColor = AppRed,
+        cursorColor = AppNavy
+    )
 
     var name by remember { mutableStateOf("") }
     var phone by remember { mutableStateOf("") }
@@ -72,6 +115,7 @@ fun EditResidentScreen(
     var dob by remember { mutableStateOf("") }
     var address by remember { mutableStateOf("") }
     var guardian by remember { mutableStateOf("") }
+
     val genders = listOf("Male", "Female", "Other")
     var expandedGender by remember { mutableStateOf(false) }
     var selectedGender by remember { mutableStateOf("Male") }
@@ -83,7 +127,6 @@ fun EditResidentScreen(
 
     val dobDatePickerState = rememberDatePickerState()
     var showDobDatePicker by remember { mutableStateOf(false) }
-
     var isLoaded by remember { mutableStateOf(false) }
 
     // Pre-fill the form ONCE when the resident loads
@@ -127,14 +170,22 @@ fun EditResidentScreen(
             !govtFrontPath.isNullOrBlank() && !govtBackPath.isNullOrBlank()
 
     Scaffold(
+        containerColor = AppBackground,
         topBar = {
             TopAppBar(
-                title = { Text("Edit Resident") },
+                title = {
+                    Text("Edit Resident", fontWeight = FontWeight.Bold, color = AppText)
+                },
                 navigationIcon = {
                     IconButton(onClick = onBackClick) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+                        Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = AppText)
                     }
-                }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = AppBackground,
+                    titleContentColor = AppText,
+                    navigationIconContentColor = AppText
+                )
             )
         }
     ) { padding ->
@@ -144,25 +195,39 @@ fun EditResidentScreen(
                 verticalArrangement = Arrangement.Center,
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                CircularProgressIndicator()
+                CircularProgressIndicator(color = AppNavy)
             }
         } else {
             Column(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(padding)
-                    .padding(16.dp)
+                    .padding(horizontal = 20.dp, vertical = 16.dp)
                     .verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+                verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                Text("Personal Details", style = MaterialTheme.typography.titleMedium)
-
-                OutlinedTextField(value = name, onValueChange = { name = it }, label = { Text("Name *") }, modifier = Modifier.fillMaxWidth())
+                SectionHeader("Personal Details")
 
                 OutlinedTextField(
-                    value = phone, onValueChange = { phone = it },
+                    value = name, onValueChange = { name = it },
+                    label = { Text("Name *") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    shape = RoundedCornerShape(12.dp),
+                    colors = textFieldColors,
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
+                    keyboardActions = KeyboardActions(onNext = { focusManager.moveFocus(FocusDirection.Down) })
+                )
+
+                OutlinedTextField(
+                    value = phone, onValueChange = { input -> phone = input.filter { it.isDigit() } },
                     label = { Text("Phone (10 digits) *") },
                     modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    shape = RoundedCornerShape(12.dp),
+                    colors = textFieldColors,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Next),
+                    keyboardActions = KeyboardActions(onNext = { focusManager.moveFocus(FocusDirection.Down) }),
                     isError = (phone.isNotBlank() && !isPhoneValid) || phoneError != null,
                     supportingText = {
                         if (phone.isNotBlank() && !isPhoneValid) Text("Must be exactly 10 digits")
@@ -175,7 +240,10 @@ fun EditResidentScreen(
                         value = selectedIdType, onValueChange = { }, readOnly = true,
                         label = { Text("ID Type *") },
                         trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expandedIdType) },
-                        modifier = Modifier.fillMaxWidth().menuAnchor()
+                        modifier = Modifier.fillMaxWidth().menuAnchor(),
+                        singleLine = true,
+                        shape = RoundedCornerShape(12.dp),
+                        colors = textFieldColors
                     )
                     ExposedDropdownMenu(expanded = expandedIdType, onDismissRequest = { expandedIdType = false }) {
                         idTypes.forEach { type ->
@@ -188,6 +256,11 @@ fun EditResidentScreen(
                     value = govtId, onValueChange = { govtId = it },
                     label = { Text("ID Number *") },
                     modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    shape = RoundedCornerShape(12.dp),
+                    colors = textFieldColors,
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
+                    keyboardActions = KeyboardActions(onNext = { focusManager.moveFocus(FocusDirection.Down) }),
                     isError = (govtId.isNotBlank() && !isIdValid) || govtIdError != null,
                     supportingText = {
                         if (govtId.isNotBlank() && !isIdValid) {
@@ -202,9 +275,14 @@ fun EditResidentScreen(
                 )
 
                 OutlinedTextField(
-                    value = emergency, onValueChange = { emergency = it },
+                    value = emergency, onValueChange = { input -> emergency = input.filter { it.isDigit() } },
                     label = { Text("Emergency Contact (10 digits) *") },
                     modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    shape = RoundedCornerShape(12.dp),
+                    colors = textFieldColors,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Next),
+                    keyboardActions = KeyboardActions(onNext = { focusManager.moveFocus(FocusDirection.Down) }),
                     isError = (emergency.isNotBlank() && !isEmergencyValid) || emergencyError != null,
                     supportingText = {
                         if (emergency.isNotBlank() && !isEmergencyValid) Text("Must be exactly 10 digits")
@@ -216,21 +294,38 @@ fun EditResidentScreen(
                     value = dob, onValueChange = { dob = it },
                     label = { Text("Date of Birth (YYYY-MM-DD) *") },
                     modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    shape = RoundedCornerShape(12.dp),
+                    colors = textFieldColors,
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
+                    keyboardActions = KeyboardActions(onNext = { focusManager.moveFocus(FocusDirection.Down) }),
                     trailingIcon = {
                         IconButton(onClick = { showDobDatePicker = true }) {
-                            Icon(Icons.Default.CalendarToday, contentDescription = "Pick DOB")
+                            Icon(Icons.Default.CalendarToday, contentDescription = "Pick DOB", tint = AppNavy)
                         }
                     }
                 )
 
-                OutlinedTextField(value = address, onValueChange = { address = it }, label = { Text("Address") }, modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(
+                    value = address, onValueChange = { address = it },
+                    label = { Text("Address") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    shape = RoundedCornerShape(12.dp),
+                    colors = textFieldColors,
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
+                    keyboardActions = KeyboardActions(onNext = { focusManager.moveFocus(FocusDirection.Down) })
+                )
 
                 ExposedDropdownMenuBox(expanded = expandedGender, onExpandedChange = { expandedGender = !expandedGender }) {
                     OutlinedTextField(
                         value = selectedGender, onValueChange = { }, readOnly = true,
                         label = { Text("Gender") },
                         trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expandedGender) },
-                        modifier = Modifier.fillMaxWidth().menuAnchor()
+                        modifier = Modifier.fillMaxWidth().menuAnchor(),
+                        singleLine = true,
+                        shape = RoundedCornerShape(12.dp),
+                        colors = textFieldColors
                     )
                     ExposedDropdownMenu(expanded = expandedGender, onDismissRequest = { expandedGender = false }) {
                         genders.forEach { gender ->
@@ -239,10 +334,19 @@ fun EditResidentScreen(
                     }
                 }
 
-                OutlinedTextField(value = guardian, onValueChange = { guardian = it }, label = { Text("Guardian Name") }, modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(
+                    value = guardian, onValueChange = { guardian = it },
+                    label = { Text("Guardian Name") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    shape = RoundedCornerShape(12.dp),
+                    colors = textFieldColors,
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                    keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus() })
+                )
 
-                Spacer(modifier = Modifier.height(16.dp))
-                Text("Documents & Photo", style = MaterialTheme.typography.titleMedium)
+                Spacer(modifier = Modifier.height(8.dp))
+                SectionHeader("Documents & Photo")
 
                 ImagePickerField(
                     label = "Govt ID - Front",
@@ -273,11 +377,27 @@ fun EditResidentScreen(
                             if (isSuccess) onBackClick()
                         }
                     },
-                    modifier = Modifier.fillMaxWidth().padding(top = 16.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 16.dp)
+                        .height(56.dp),
+                    shape = RoundedCornerShape(18.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = AppNavy,
+                        contentColor = Color.White,
+                        disabledContainerColor = AppBorder,
+                        disabledContentColor = AppMuted
+                    ),
                     enabled = isFormValid
                 ) {
-                    Text("Save Changes")
+                    Text(
+                        "Save Changes",
+                        fontWeight = FontWeight.Bold,
+                        style = MaterialTheme.typography.titleMedium
+                    )
                 }
+
+                Spacer(modifier = Modifier.height(24.dp))
             }
         }
     }
@@ -294,8 +414,31 @@ fun EditResidentScreen(
                     showDobDatePicker = false
                 }) { Text("OK") }
             },
-            dismissButton = { TextButton(onClick = { showDobDatePicker = false }) { Text("Cancel") } }
-        ) { DatePicker(state = dobDatePickerState) }
+            dismissButton = {
+                TextButton(onClick = { showDobDatePicker = false }) { Text("Cancel") }
+            }
+        ) {
+            DatePicker(state = dobDatePickerState)
+        }
+    }
+}
+
+@Composable
+private fun SectionHeader(title: String) {
+    Column(modifier = Modifier.padding(top = 8.dp)) {
+        Text(
+            title,
+            style = MaterialTheme.typography.titleMedium,
+            color = AppText,
+            fontWeight = FontWeight.Bold
+        )
+        Spacer(modifier = Modifier.height(6.dp))
+        Box(
+            modifier = Modifier
+                .width(32.dp)
+                .height(2.dp)
+                .background(AppNavy)
+        )
     }
 }
 

@@ -6,7 +6,9 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -15,9 +17,17 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.example.hostelmanager.data.RoomEntity
+import com.example.hostelmanager.ui.theme.AppBorder
+import com.example.hostelmanager.ui.theme.AppCard
+import com.example.hostelmanager.ui.theme.AppGreen
+import com.example.hostelmanager.ui.theme.AppMuted
+import com.example.hostelmanager.ui.theme.AppNavy
+import com.example.hostelmanager.ui.theme.AppRed
+import com.example.hostelmanager.ui.theme.AppText
 
 @Composable
 fun EditRoomDialog(
@@ -26,7 +36,6 @@ fun EditRoomDialog(
     onDismiss: () -> Unit,
     onConfirm: (roomNumber: String, floor: Int, bedCount: Int, rentPerBedPaise: Long) -> Unit
 ) {
-    // Pre-fill the boxes with the room's CURRENT values
     var roomNumber by remember { mutableStateOf(room.roomNumber) }
     var floor by remember { mutableStateOf(room.floor.toString()) }
     var beds by remember { mutableStateOf(room.bedCount.toString()) }
@@ -34,12 +43,39 @@ fun EditRoomDialog(
 
     val bedsInt = beds.toIntOrNull() ?: 0
     val isBedsNumberValid = bedsInt >= 1
-    val isBedsEnough = bedsInt >= occupiedBeds   // Safety rule
+    val isBedsEnough = bedsInt >= occupiedBeds
     val isFormValid = roomNumber.isNotBlank() && isBedsNumberValid && isBedsEnough && rent.isNotBlank()
+
+    // Explicit high-contrast colors for text fields
+    val textFieldColors = OutlinedTextFieldDefaults.colors(
+        focusedTextColor = AppText,
+        unfocusedTextColor = AppText,
+        disabledTextColor = AppMuted,
+        focusedLabelColor = AppNavy,
+        unfocusedLabelColor = AppMuted,
+        disabledLabelColor = AppMuted,
+        focusedBorderColor = AppNavy,
+        unfocusedBorderColor = AppBorder,
+        disabledBorderColor = AppBorder,
+        errorBorderColor = AppRed,
+        errorLabelColor = AppRed,
+        errorTextColor = AppText,
+        errorSupportingTextColor = AppRed
+    )
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Edit Room") },
+        shape = androidx.compose.foundation.shape.RoundedCornerShape(24.dp),
+        containerColor = AppCard,
+        titleContentColor = AppText,
+        textContentColor = AppText,
+        title = {
+            Text(
+                "Edit Room",
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold
+            )
+        },
         text = {
             Column {
                 OutlinedTextField(
@@ -47,24 +83,29 @@ fun EditRoomDialog(
                     onValueChange = { roomNumber = it },
                     label = { Text("Room Number *") },
                     modifier = Modifier.fillMaxWidth(),
-                    singleLine = true
+                    singleLine = true,
+                    colors = textFieldColors
                 )
                 Spacer(modifier = Modifier.height(8.dp))
+
                 OutlinedTextField(
                     value = floor,
                     onValueChange = { input -> floor = input.filter { it.isDigit() } },
                     label = { Text("Floor") },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
+                    colors = textFieldColors,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
                 )
                 Spacer(modifier = Modifier.height(8.dp))
+
                 OutlinedTextField(
                     value = beds,
                     onValueChange = { input -> beds = input.filter { it.isDigit() } },
                     label = { Text("Number of Beds *") },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
+                    colors = textFieldColors,
                     isError = beds.isNotBlank() && (!isBedsNumberValid || !isBedsEnough),
                     supportingText = {
                         if (beds.isNotBlank() && !isBedsNumberValid) {
@@ -76,12 +117,14 @@ fun EditRoomDialog(
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
                 )
                 Spacer(modifier = Modifier.height(8.dp))
+
                 OutlinedTextField(
                     value = rent,
                     onValueChange = { input -> rent = input.filter { it.isDigit() } },
                     label = { Text("Rent per Bed (₹) *") },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
+                    colors = textFieldColors,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
                 )
             }
@@ -93,14 +136,18 @@ fun EditRoomDialog(
                         roomNumber.trim(),
                         floor.toIntOrNull() ?: 0,
                         bedsInt,
-                        (rent.toLongOrNull() ?: 0L) * 100  // rupees → paise
+                        (rent.toLongOrNull() ?: 0L) * 100
                     )
                 },
                 enabled = isFormValid
-            ) { Text("Save") }
+            ) {
+                Text("Save", color = AppGreen, fontWeight = FontWeight.Bold)
+            }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Cancel") }
+            TextButton(onClick = onDismiss) {
+                Text("Cancel", color = AppMuted, fontWeight = FontWeight.Medium)
+            }
         }
     )
 }
