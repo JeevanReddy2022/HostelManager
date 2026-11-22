@@ -1,5 +1,8 @@
 package com.example.hostelmanager.ui.dashboard
 
+import androidx.compose.animation.core.LinearOutSlowInEasing
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -9,17 +12,25 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import java.text.NumberFormat
@@ -32,11 +43,11 @@ import kotlin.math.abs
 private val PremiumBackground = Color(0xFFF6F8FB)
 private val PremiumNavy = Color(0xFF0B1F33)
 private val PremiumNavyLight = Color(0xFF123B5D)
+private val PremiumTeal = Color(0xFF0F766E)
 private val PremiumCard = Color(0xFFFFFFFF)
 private val PremiumText = Color(0xFF0F172A)
 private val PremiumMuted = Color(0xFF64748B)
 private val PremiumBorder = Color(0xFFE2E8F0)
-
 private val PremiumSky = Color(0xFF38BDF8)
 private val PremiumGreen = Color(0xFF10B981)
 private val PremiumOrange = Color(0xFFF97316)
@@ -45,6 +56,14 @@ private val PremiumSoftBlue = Color(0xFFE0F2FE)
 private val PremiumSoftGreen = Color(0xFFD1FAE5)
 private val PremiumSoftOrange = Color(0xFFFFEDD5)
 private val PremiumSoftRed = Color(0xFFFFE4E6)
+
+// Shared gradient so the floating pill and the footer button read as the same control
+private val ManageGradient = Brush.horizontalGradient(
+    listOf(PremiumNavy, PremiumNavyLight, PremiumTeal)
+)
+
+private val FabShape = RoundedCornerShape(22.dp)
+private val FooterButtonShape = RoundedCornerShape(20.dp)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -59,6 +78,40 @@ fun DashboardScreen(
     }
 
     val stats by viewModel.stats.collectAsState()
+    val scrollState = rememberScrollState()
+    val density = LocalDensity.current
+
+    // Height of the footer block (button + caption), measured once it lays out.
+    val footerHeightPx = remember { mutableIntStateOf(0) }
+
+    // 0f = footer still below the fold  ->  floating pill fully visible
+    // 1f = footer fully on screen       ->  floating pill fully gone
+    val rawReveal by remember(density) {
+        derivedStateOf {
+            val max = scrollState.maxValue
+            when {
+                // Not measured yet, or nothing to scroll: the footer is already reachable.
+                max == Int.MAX_VALUE -> 1f
+                max <= 0 -> 1f
+                else -> {
+                    val trailingBreathingRoom = with(density) { 40.dp.toPx() }
+                    val zone = (footerHeightPx.value + trailingBreathingRoom).coerceAtLeast(1f)
+                    val remaining = (max - scrollState.value).toFloat()
+                    (1f - (remaining / zone)).coerceIn(0f, 1f)
+                }
+            }
+        }
+    }
+
+    // Softens the hand-off so a fast fling still reads as a fade, not a pop.
+    val reveal by animateFloatAsState(
+        targetValue = rawReveal,
+        animationSpec = tween(durationMillis = 180, easing = LinearOutSlowInEasing),
+        label = "manageHostelReveal"
+    )
+
+    val fabAlpha = (1f - reveal * 1.35f).coerceIn(0f, 1f)
+    val footerAlpha = (reveal * 1.15f).coerceIn(0f, 1f)
 
     Scaffold(
         containerColor = PremiumBackground,
@@ -81,6 +134,14 @@ fun DashboardScreen(
                     navigationIconContentColor = PremiumText
                 )
             )
+        },
+        floatingActionButton = {
+            if (stats != null && fabAlpha > 0.01f) {
+                ManageHostelFloatingPill(
+                    alpha = fabAlpha,
+                    onClick = onManageHostelClick
+                )
+            }
         }
     ) { padding ->
         val currentStats = stats
@@ -89,7 +150,7 @@ fun DashboardScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .verticalScroll(rememberScrollState())
+                .verticalScroll(scrollState)
                 .padding(horizontal = 20.dp, vertical = 12.dp),
             verticalArrangement = Arrangement.spacedBy(18.dp)
         ) {
@@ -111,21 +172,147 @@ fun DashboardScreen(
             } else {
                 DashboardContent(
                     stats = currentStats,
-                    onManageHostelClick = onManageHostelClick
+                    onManageHostelClick = onManageHostelClick,
+                    footerAlpha = footerAlpha,
+                    onFooterHeightChanged = { footerHeightPx.value = it }
                 )
             }
         }
     }
 }
 
+/* ------------------------------------------------------------------ */
+/*  Manage Hostel — floating pill (bottom-right, fades out at the end) */
+/* ------------------------------------------------------------------ */
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ManageHostelFloatingPill(
+    alpha: Float,
+    onClick: () -> Unit
+) {
+    Surface(
+        onClick = onClick,
+        shape = FabShape,
+        color = PremiumNavy,
+        contentColor = Color.White,
+        shadowElevation = 10.dp,
+        modifier = Modifier.graphicsLayer {
+            this.alpha = alpha
+            val scale = 0.86f + 0.14f * alpha
+            scaleX = scale
+            scaleY = scale
+            translationY = (1f - alpha) * 34f
+        }
+    ) {
+        Row(
+            modifier = Modifier
+                .background(ManageGradient)
+                .padding(horizontal = 22.dp, vertical = 16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                imageVector = Icons.Default.Settings,
+                contentDescription = null,
+                modifier = Modifier.size(20.dp),
+                tint = Color.White
+            )
+            Spacer(modifier = Modifier.width(10.dp))
+            Text(
+                "Manage Hostel",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                color = Color.White,
+                maxLines = 1
+            )
+        }
+    }
+}
+
+/* ------------------------------------------------------------------ */
+/*  Manage Hostel — footer button (fades in as you reach the bottom)   */
+/* ------------------------------------------------------------------ */
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ManageHostelFooter(
+    alpha: Float,
+    onClick: () -> Unit,
+    onHeightChanged: (Int) -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .onSizeChanged { onHeightChanged(it.height) },
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Surface(
+            onClick = onClick,
+            enabled = alpha > 0.15f,
+            shape = FooterButtonShape,
+            color = PremiumNavy,
+            contentColor = Color.White,
+            shadowElevation = if (alpha > 0.5f) 6.dp else 0.dp,
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(58.dp)
+                .graphicsLayer {
+                    this.alpha = alpha
+                    translationY = (1f - alpha) * 22f
+                }
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(ManageGradient)
+                    .padding(horizontal = 20.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Settings,
+                    contentDescription = null,
+                    modifier = Modifier.size(20.dp),
+                    tint = Color.White
+                )
+                Spacer(modifier = Modifier.width(10.dp))
+                Text(
+                    "Manage Hostel",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White,
+                    maxLines = 1
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(10.dp))
+
+        Text(
+            "Rooms • Residents • Payments • Expenses • Reports",
+            style = MaterialTheme.typography.bodySmall,
+            color = PremiumMuted,
+            modifier = Modifier
+                .fillMaxWidth()
+                .graphicsLayer { this.alpha = alpha },
+            textAlign = TextAlign.Center
+        )
+    }
+}
+
+/* ------------------------------------------------------------------ */
+/*  Dashboard content                                                  */
+/* ------------------------------------------------------------------ */
+
 @Composable
 private fun DashboardContent(
     stats: DashboardStats,
-    onManageHostelClick: () -> Unit
+    onManageHostelClick: () -> Unit,
+    footerAlpha: Float,
+    onFooterHeightChanged: (Int) -> Unit
 ) {
     val currentMonth = YearMonth.now()
     val lastMonth = currentMonth.minusMonths(1)
-
     val currentMonthTitle = formatMonthTitle(currentMonth)
     val lastMonthTitle = formatMonthTitle(lastMonth)
 
@@ -151,7 +338,6 @@ private fun DashboardContent(
             softAccent = PremiumSoftBlue,
             modifier = Modifier.weight(1f)
         )
-
         SmallMetricCard(
             title = "Payments",
             value = stats.paymentsThisMonth.toString(),
@@ -224,34 +410,18 @@ private fun DashboardContent(
         isProfitCard = true
     )
 
-    Button(
+    ManageHostelFooter(
+        alpha = footerAlpha,
         onClick = onManageHostelClick,
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(56.dp),
-        shape = RoundedCornerShape(18.dp),
-        colors = ButtonDefaults.buttonColors(
-            containerColor = PremiumNavy,
-            contentColor = Color.White
-        )
-    ) {
-        Text(
-            "Manage Hostel",
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.SemiBold
-        )
-    }
-
-    Text(
-        "Rooms • Residents • Payments • Expenses • Reports",
-        style = MaterialTheme.typography.bodySmall,
-        color = PremiumMuted,
-        modifier = Modifier.fillMaxWidth(),
-        textAlign = androidx.compose.ui.text.style.TextAlign.Center
+        onHeightChanged = onFooterHeightChanged
     )
 
-    Spacer(modifier = Modifier.height(12.dp))
+    Spacer(modifier = Modifier.height(6.dp))
 }
+
+/* ------------------------------------------------------------------ */
+/*  Cards                                                              */
+/* ------------------------------------------------------------------ */
 
 @Composable
 private fun HeroProfitCard(
@@ -276,7 +446,7 @@ private fun HeroProfitCard(
                         colors = listOf(
                             PremiumNavy,
                             PremiumNavyLight,
-                            Color(0xFF0F766E)
+                            PremiumTeal
                         )
                     )
                 )
@@ -328,15 +498,12 @@ private fun HeroProfitCard(
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Medium
                     )
-
                     Spacer(modifier = Modifier.height(6.dp))
-
                     Text(
                         "Net Profit",
                         color = Color.White.copy(alpha = 0.72f),
                         style = MaterialTheme.typography.bodyMedium
                     )
-
                     Text(
                         formatCurrency(profitPaise),
                         color = if (isLoss) Color(0xFFFF8FA3) else Color.White,
@@ -355,7 +522,6 @@ private fun HeroProfitCard(
                         value = formatCurrency(incomePaise),
                         modifier = Modifier.weight(1f)
                     )
-
                     HeroMiniStat(
                         title = "Spent",
                         value = formatCurrency(expensePaise),
@@ -510,7 +676,6 @@ private fun WideMetricCard(
                     color = PremiumMuted
                 )
             }
-
             Text(
                 value,
                 style = MaterialTheme.typography.headlineSmall,
@@ -564,7 +729,6 @@ private fun OccupancyCard(
                         fontWeight = FontWeight.Bold
                     )
                 }
-
                 Column(horizontalAlignment = Alignment.End) {
                     Text(
                         "Available Beds",
@@ -632,13 +796,11 @@ private fun StatementCard(
         ) {
             rows.forEachIndexed { index, row ->
                 val isLoss = row.amountPaise < 0
-
                 val amountColor = if (isProfitCard) {
                     if (isLoss) PremiumRed else PremiumGreen
                 } else {
                     row.accent
                 }
-
                 val softColor = if (isProfitCard) {
                     if (isLoss) PremiumSoftRed else PremiumSoftGreen
                 } else {
@@ -670,9 +832,7 @@ private fun StatementCard(
                                     .background(amountColor)
                             )
                         }
-
                         Spacer(modifier = Modifier.width(12.dp))
-
                         Column {
                             Text(
                                 row.label,
@@ -680,7 +840,6 @@ private fun StatementCard(
                                 color = PremiumText,
                                 fontWeight = FontWeight.SemiBold
                             )
-
                             if (isProfitCard) {
                                 Text(
                                     if (isLoss) "Loss" else "Profit",
@@ -690,7 +849,6 @@ private fun StatementCard(
                             }
                         }
                     }
-
                     Text(
                         formatCurrency(row.amountPaise),
                         style = MaterialTheme.typography.titleLarge,
@@ -710,6 +868,10 @@ private fun StatementCard(
     }
 }
 
+/* ------------------------------------------------------------------ */
+/*  Helpers                                                            */
+/* ------------------------------------------------------------------ */
+
 private fun formatMonthTitle(yearMonth: YearMonth): String {
     val monthName = yearMonth.month.getDisplayName(TextStyle.FULL, Locale.getDefault())
     return "$monthName - ${yearMonth.year}"
@@ -721,6 +883,5 @@ fun formatCurrency(amountPaise: Long): String {
         maximumFractionDigits = 0
         minimumFractionDigits = 0
     }.format(rupees)
-
     return if (amountPaise < 0) "-₹$formatted" else "₹$formatted"
 }

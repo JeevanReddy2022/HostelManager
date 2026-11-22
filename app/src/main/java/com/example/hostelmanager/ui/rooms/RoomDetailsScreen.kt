@@ -106,6 +106,7 @@ fun RoomDetailsScreen(
     var showOccupiedDialog by remember { mutableStateOf(false) }
     var showArchiveDialog by remember { mutableStateOf(false) }
     var showDeleteDialog by remember { mutableStateOf(false) }
+    var showRoomFullDialog by remember { mutableStateOf(false) }
 
     LaunchedEffect(roomRemoved) {
         if (roomRemoved) onBackClick()
@@ -137,7 +138,14 @@ fun RoomDetailsScreen(
         },
         floatingActionButton = {
             FloatingActionButton(
-                onClick = onAddResidentClick,
+                onClick = {
+                    val vacancy = (room?.bedCount ?: 0) - residents.size
+                    if (vacancy > 0) {
+                        onAddResidentClick()
+                    } else {
+                        showRoomFullDialog = true
+                    }
+                },
                 shape = RoundedCornerShape(18.dp),
                 containerColor = AppNavy,
                 contentColor = Color.White,
@@ -282,7 +290,7 @@ fun RoomDetailsScreen(
                         ) {
                             Icon(Icons.Default.PersonAdd, contentDescription = null, modifier = Modifier.size(18.dp))
                             Spacer(modifier = Modifier.width(8.dp))
-                            Text("Add Resident to this Room", fontWeight = FontWeight.Bold)
+                            Text("Add Resident to this Room", fontWeight = FontWeight.Bold, color= AppGreen)
                         }
                     }
                 }
@@ -421,7 +429,27 @@ fun RoomDetailsScreen(
             }
         )
     }
+    // 6. Room full dialog
+    if (showRoomFullDialog) {
+        AlertDialog(
+            onDismissRequest = { showRoomFullDialog = false },
+            shape = RoundedCornerShape(24.dp),
+            containerColor = AppCard,
+            titleContentColor = AppText,
+            textContentColor = AppMuted,
+            title = { Text("Room is Full", fontWeight = FontWeight.Bold) },
+            text = {
+                Text("This room has no vacant beds. Please check out a resident or add the person to a different room.")
+            },
+            confirmButton = {
+                TextButton(onClick = { showRoomFullDialog = false }) {
+                    Text("OK", color = AppNavy, fontWeight = FontWeight.Bold)
+                }
+            }
+        )
+    }
 }
+
 
 @Composable
 private fun ResidentDetailCard(residentWithRoom: ResidentWithRoom, onClick: () -> Unit) {

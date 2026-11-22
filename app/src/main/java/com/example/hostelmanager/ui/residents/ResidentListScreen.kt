@@ -10,6 +10,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -24,9 +25,12 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Call
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Message
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PersonAdd
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.SearchOff
 import androidx.compose.material.icons.filled.Sms
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -38,6 +42,9 @@ import androidx.compose.material3.FloatingActionButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -55,7 +62,10 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import com.example.hostelmanager.R
@@ -65,10 +75,13 @@ import com.example.hostelmanager.ui.theme.AppBorder
 import com.example.hostelmanager.ui.theme.AppCard
 import com.example.hostelmanager.ui.theme.AppMuted
 import com.example.hostelmanager.ui.theme.AppNavy
+import com.example.hostelmanager.ui.theme.AppOrange
 import com.example.hostelmanager.ui.theme.AppSoftBlue
+import com.example.hostelmanager.ui.theme.AppSoftOrange
 import com.example.hostelmanager.ui.theme.AppText
 import java.io.File
 import java.net.URLEncoder
+import java.text.NumberFormat
 import java.time.LocalDate
 import java.time.format.TextStyle
 import java.util.Locale
@@ -83,66 +96,54 @@ fun ResidentListScreen(
     modifier: Modifier = Modifier,
     viewModel: ResidentListViewModel = viewModel()
 ) {
-    LaunchedEffect(hostelId) {
-        viewModel.setHostelId(hostelId)
-    }
+    LaunchedEffect(hostelId) { viewModel.setHostelId(hostelId) }
 
-    val residents by viewModel.residents.collectAsState()
+    val allResidents by viewModel.residents.collectAsState()
+    val query by viewModel.query.collectAsState()
+
+    val visibleResidents = remember(allResidents, query) {
+        searchResidents(allResidents, query)
+    }
 
     Box(
         modifier = modifier
             .fillMaxSize()
             .background(AppBackground)
     ) {
-        if (residents.isEmpty()) {
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(20.dp),
-                verticalArrangement = Arrangement.Center,
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(80.dp)
-                        .clip(CircleShape)
-                        .background(AppSoftBlue),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        Icons.Default.Person,
-                        contentDescription = null,
-                        tint = AppNavy,
-                        modifier = Modifier.size(40.dp)
-                    )
-                }
-                Spacer(modifier = Modifier.height(16.dp))
-                Text(
-                    "No active residents in this hostel.",
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold,
-                    color = AppText
-                )
-                Spacer(modifier = Modifier.height(6.dp))
-                Text(
-                    "Tap the + button to admit a new resident.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = AppMuted
+        Column(modifier = Modifier.fillMaxSize()) {
+
+            if (allResidents.isNotEmpty()) {
+                ResidentSearchDeck(
+                    query = query,
+                    resultCount = visibleResidents.size,
+                    totalCount = allResidents.size,
+                    onQueryChange = viewModel::setQuery,
+                    onClearSearch = viewModel::clearSearch
                 )
             }
-        } else {
-            LazyColumn(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(horizontal = 20.dp)
-                    .padding(bottom = 88.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                items(residents) { residentWithRoom ->
-                    ResidentCard(
-                        residentWithRoom = residentWithRoom,
-                        onClick = { onResidentClick(residentWithRoom.person.id) }
-                    )
+
+            when {
+                allResidents.isEmpty() -> EmptyResidentList()
+
+                visibleResidents.isEmpty() -> NoMatchingResidents(
+                    query = query,
+                    onClearSearch = viewModel::clearSearch
+                )
+
+                else -> LazyColumn(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(horizontal = 20.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                    contentPadding = PaddingValues(top = 14.dp, bottom = 96.dp)
+                ) {
+                    items(visibleResidents, key = { it.person.id }) { residentWithRoom ->
+                        ResidentCard(
+                            residentWithRoom = residentWithRoom,
+                            onClick = { onResidentClick(residentWithRoom.person.id) },
+                            modifier = Modifier.animateItem()
+                        )
+                    }
                 }
             }
         }
@@ -162,14 +163,127 @@ fun ResidentListScreen(
     }
 }
 
+/* ------------------------------------------------------------------ */
+/*  Search deck                                                        */
+/* ------------------------------------------------------------------ */
+
 @Composable
-fun ResidentCard(residentWithRoom: ResidentWithRoom, onClick: () -> Unit) {
+private fun ResidentSearchDeck(
+    query: String,
+    resultCount: Int,
+    totalCount: Int,
+    onQueryChange: (String) -> Unit,
+    onClearSearch: () -> Unit
+) {
+    Surface(
+        color = AppCard,
+        shadowElevation = 3.dp,
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(
+            modifier = Modifier.padding(start = 20.dp, end = 20.dp, top = 12.dp, bottom = 10.dp)
+        ) {
+            OutlinedTextField(
+                value = query,
+                onValueChange = onQueryChange,
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                shape = RoundedCornerShape(14.dp),
+                placeholder = {
+                    Text("Name, room, ID or phone…", color = AppMuted, maxLines = 1)
+                },
+                leadingIcon = {
+                    Icon(
+                        Icons.Default.Search,
+                        contentDescription = null,
+                        modifier = Modifier.size(20.dp)
+                    )
+                },
+                trailingIcon = {
+                    if (query.isNotEmpty()) {
+                        IconButton(onClick = { onQueryChange("") }) {
+                            Icon(
+                                Icons.Default.Close,
+                                contentDescription = "Clear search",
+                                tint = AppMuted,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+                    }
+                },
+                textStyle = MaterialTheme.typography.bodyLarge,
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedTextColor = AppText,
+                    unfocusedTextColor = AppText,
+                    focusedBorderColor = AppNavy,
+                    unfocusedBorderColor = AppBorder,
+                    focusedContainerColor = AppBackground,
+                    unfocusedContainerColor = AppBackground,
+                    cursorColor = AppNavy,
+                    focusedLeadingIconColor = AppNavy,
+                    unfocusedLeadingIconColor = AppMuted
+                )
+            )
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    "Showing $resultCount of $totalCount residents",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = AppMuted,
+                    fontWeight = FontWeight.Medium,
+                    modifier = Modifier.weight(1f)
+                )
+                if (query.isNotBlank()) {
+                    Surface(
+                        onClick = onClearSearch,
+                        shape = RoundedCornerShape(50),
+                        color = AppSoftOrange,
+                        contentColor = AppOrange
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                Icons.Default.Close,
+                                contentDescription = null,
+                                modifier = Modifier.size(13.dp)
+                            )
+                            Spacer(modifier = Modifier.width(5.dp))
+                            Text(
+                                "Clear search",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+/* ------------------------------------------------------------------ */
+/*  Resident card                                                      */
+/* ------------------------------------------------------------------ */
+
+@Composable
+fun ResidentCard(
+    residentWithRoom: ResidentWithRoom,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
     val person = residentWithRoom.person
     val context = LocalContext.current
     var showMessageDialog by remember { mutableStateOf(false) }
 
     Card(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .clickable { onClick() },
         shape = RoundedCornerShape(20.dp),
@@ -180,58 +294,72 @@ fun ResidentCard(residentWithRoom: ResidentWithRoom, onClick: () -> Unit) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp),
+                .padding(14.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // LEFT: Circular person photo
             ResidentAvatar(photoPath = person.profilePhotoPath)
 
-            Spacer(modifier = Modifier.width(14.dp))
+            Spacer(modifier = Modifier.width(12.dp))
 
-            // MIDDLE: Name, room, rent
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     person.name,
-                    style = MaterialTheme.typography.titleLarge,
+                    style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
-                    color = AppText
+                    color = AppText,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
 
-                Spacer(modifier = Modifier.height(6.dp))
+                Spacer(modifier = Modifier.height(7.dp))
 
-                Row {
-                    Box(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(50))
-                            .background(AppSoftBlue)
-                            .padding(horizontal = 10.dp, vertical = 4.dp)
-                    ) {
-                        Text(
-                            "Room ${residentWithRoom.roomNumber}",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = AppNavy,
-                            fontWeight = FontWeight.SemiBold
-                        )
-                    }
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Box(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(50))
-                            .background(AppSoftBlue.copy(alpha = 0.6f))
-                            .padding(horizontal = 10.dp, vertical = 4.dp)
-                    ) {
-                        Text(
-                            "₹${residentWithRoom.monthlyRent / 100}",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = AppNavy,
-                            fontWeight = FontWeight.SemiBold
-                        )
-                    }
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(50))
+                        .background(AppSoftBlue)
+                        .padding(horizontal = 10.dp, vertical = 4.dp)
+                ) {
+                    Text(
+                        "Room ${residentWithRoom.roomNumber}",
+                        fontSize = 11.sp,
+                        color = AppNavy,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(7.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        person.phone,
+                        fontSize = 12.sp,
+                        color = AppMuted,
+                        maxLines = 1,
+                        modifier = Modifier.weight(1f)
+                    )
+                    Text(
+                        "${formatRupees(residentWithRoom.monthlyRent)}/mo",
+                        fontSize = 12.sp,
+                        color = AppNavy,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1
+                    )
                 }
             }
 
-            // RIGHT: Call + Message buttons
-            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+            Spacer(modifier = Modifier.width(4.dp))
+
+            // Call + Message side by side, larger icons.
+            // Fixed 80.dp height keeps the card exactly as tall as before.
+            Row(
+                modifier = Modifier.height(80.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(2.dp)
+            ) {
                 IconButton(
                     onClick = {
                         val intent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:${person.phone}"))
@@ -240,32 +368,33 @@ fun ResidentCard(residentWithRoom: ResidentWithRoom, onClick: () -> Unit) {
                         } catch (e: ActivityNotFoundException) {
                             Toast.makeText(context, "No dialer app found", Toast.LENGTH_SHORT).show()
                         }
-                    }
+                    },
+                    modifier = Modifier.size(40.dp)
                 ) {
                     Icon(
                         imageVector = Icons.Default.Call,
                         contentDescription = "Call",
-                        tint = AppNavy
+                        tint = AppNavy,
+                        modifier = Modifier.size(26.dp)
                     )
                 }
-
                 IconButton(
-                    onClick = { showMessageDialog = true }
+                    onClick = { showMessageDialog = true },
+                    modifier = Modifier.size(40.dp)
                 ) {
                     Icon(
                         imageVector = Icons.Default.Message,
                         contentDescription = "Message",
-                        tint = AppNavy
+                        tint = AppNavy,
+                        modifier = Modifier.size(26.dp)
                     )
                 }
             }
         }
     }
 
-    // WhatsApp/SMS Choice Dialog
     if (showMessageDialog) {
         val rentAmount = residentWithRoom.monthlyRent / 100
-
         MessageChoiceDialog(
             personName = person.name,
             phone = person.phone,
@@ -300,6 +429,10 @@ fun ResidentCard(residentWithRoom: ResidentWithRoom, onClick: () -> Unit) {
         )
     }
 }
+
+/* ------------------------------------------------------------------ */
+/*  Shared pieces (used by other screens — do not rename)              */
+/* ------------------------------------------------------------------ */
 
 @Composable
 fun ResidentAvatar(photoPath: String?) {
@@ -337,7 +470,6 @@ fun MessageChoiceDialog(
     onWhatsAppClick: () -> Unit,
     onSmsClick: () -> Unit
 ) {
-    // Same style for the title and both buttons so they match in size
     val bigStyle = MaterialTheme.typography.titleLarge
 
     AlertDialog(
@@ -354,7 +486,6 @@ fun MessageChoiceDialog(
                 Text("Choose how to send the rent reminder to $personName:")
                 Spacer(modifier = Modifier.height(20.dp))
 
-                // WhatsApp button
                 Button(
                     onClick = onWhatsAppClick,
                     modifier = Modifier
@@ -378,7 +509,6 @@ fun MessageChoiceDialog(
 
                 Spacer(modifier = Modifier.height(12.dp))
 
-                // SMS button
                 Button(
                     onClick = onSmsClick,
                     modifier = Modifier
@@ -407,4 +537,121 @@ fun MessageChoiceDialog(
             }
         }
     )
+}
+
+/* ------------------------------------------------------------------ */
+/*  Empty states                                                       */
+/* ------------------------------------------------------------------ */
+
+@Composable
+private fun EmptyResidentList() {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(20.dp),
+        verticalArrangement = Arrangement.Center,
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Box(
+            modifier = Modifier
+                .size(80.dp)
+                .clip(CircleShape)
+                .background(AppSoftBlue),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                Icons.Default.Person,
+                contentDescription = null,
+                tint = AppNavy,
+                modifier = Modifier.size(40.dp)
+            )
+        }
+        Spacer(modifier = Modifier.height(16.dp))
+        Text(
+            "No active residents in this hostel.",
+            style = MaterialTheme.typography.titleLarge,
+            fontWeight = FontWeight.Bold,
+            color = AppText,
+            textAlign = TextAlign.Center
+        )
+        Spacer(modifier = Modifier.height(6.dp))
+        Text(
+            "Tap the + button to admit a new resident.",
+            style = MaterialTheme.typography.bodyMedium,
+            color = AppMuted
+        )
+    }
+}
+
+@Composable
+private fun NoMatchingResidents(query: String, onClearSearch: () -> Unit) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(24.dp),
+        verticalArrangement = Arrangement.Center,
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Box(
+            modifier = Modifier
+                .size(80.dp)
+                .clip(CircleShape)
+                .background(AppSoftOrange),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                Icons.Default.SearchOff,
+                contentDescription = null,
+                tint = AppOrange,
+                modifier = Modifier.size(38.dp)
+            )
+        }
+        Spacer(modifier = Modifier.height(16.dp))
+        Text(
+            "No residents match",
+            style = MaterialTheme.typography.titleLarge,
+            fontWeight = FontWeight.Bold,
+            color = AppText
+        )
+        Spacer(modifier = Modifier.height(6.dp))
+        Text(
+            "Nothing found for “$query”.\nTry a name, room number, Govt ID or phone number.",
+            style = MaterialTheme.typography.bodyMedium,
+            color = AppMuted,
+            textAlign = TextAlign.Center
+        )
+        Spacer(modifier = Modifier.height(18.dp))
+        Surface(
+            onClick = onClearSearch,
+            shape = RoundedCornerShape(14.dp),
+            color = AppNavy,
+            contentColor = Color.White
+        ) {
+            Row(
+                modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    Icons.Default.Close,
+                    contentDescription = null,
+                    modifier = Modifier.size(16.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("Clear search", fontWeight = FontWeight.Bold)
+            }
+        }
+    }
+}
+
+/* ------------------------------------------------------------------ */
+/*  Helpers                                                            */
+/* ------------------------------------------------------------------ */
+
+private fun formatRupees(amountPaise: Long): String {
+    val rupees = amountPaise / 100
+    val formatted = NumberFormat.getNumberInstance(Locale("en", "IN")).apply {
+        maximumFractionDigits = 0
+        minimumFractionDigits = 0
+    }.format(rupees)
+    return "₹$formatted"
 }
